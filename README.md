@@ -1,5 +1,22 @@
-# gameTracker
-a project that tracks all your game activity on PSN.
+# Game Tracker for PSN
+The project aims to help users organize and track their video game lives. This allows users to add their games into the tracker or the wishlist along with the games' metadata such as genre, Metracritics scores, release data etc.
+
+The project will consist of the following features
+
+1. Keep track of games that the users are interested in as a tracker or wishlist.
+2. Metadata of the registered games are provided such as genres, developers, release dates, Meta/Opencritics scores and etc.
+3. The tracker provides the users' playing data from PSN such as played time, trophe progress and etc.
+4. The tracker provides notification on drops on prices of the registered games.
+5. The tracker provides notification when the release dates of the registered games come.
+6. The tracker allows users to set the status of the games and set their goals such as all tropheis or n times of playthrough.
+
+The project will use the following technologies
+
+1. Python as the main programming language.
+2. SQL as DB
+3. PSN API
+4. Circle CI as CI
+5. AWS as hosting the server
 
 The game tracker will track the games the user is currently playing, has played or will play. It will consist of a server API and a client API based on REST API. The server API will process requests from the client API with data into a database. For now, the data will be stored in .csv format but it will be replaced with SQL database later. The server API will be written in Python. It will gather meta data of each from Wikipedia by using its [API](https://api.wikimedia.org/wiki/Getting_started_with_Wikimedia_APIs). The data of playing games will be retrived by using [PSN API](https://www.npmjs.com/package/psn-api).
 
