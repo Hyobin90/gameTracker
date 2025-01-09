@@ -31,6 +31,7 @@ class game:
     """A class to hold metadata on a game"""
     def __init__(self, title: str, released: bool, purchase_date: str, playing_platform: str, status: str, hyped_level: str):
         self.title = self._verify_title(title)
+        self.released = released # TODO verify compared to the current date with the release date
         self.purchase_date = purchase_date
         self.play_platform = playing_platform
         self.status = status
@@ -45,6 +46,7 @@ class game:
         self.genre = ''
         self.developer = ''
         self.publisher = ''
+        self.release_date = ''
 
         # from `Metacritics`
         self.meta_critics_score = 0
