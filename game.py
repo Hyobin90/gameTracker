@@ -26,76 +26,74 @@ class Status(Enum):
 # TODO with PSN API, would it be possible to add an entry automatically each time a game is purchased?
 class Game:
     """A class to hold metadata on a game"""
-    def __init__(self, title: str, released: bool, purchase_date: str, playing_platform: str, status: str, hyped_level: str):
-        self.title = self._verify_title(title)
-        self.released = released # TODO verify compared to the current date with the release date
-        self.purchase_date = purchase_date
-        self.play_platform = playing_platform
-        self.status = status
-        self.hyped_level = hyped_level
-
-        # attributes to be filled automatically
-        # from `WikiData`
-        self.genre = ''
-        self.developer = ''
-        self.publisher = ''
-        self.release_date = ''
-
-        # from `Metacritics`
-        self.meta_critics_score = 0
-        self.meta_user_score = 0
-        # from `Opencritics`
-        self.open_critics_score = 0
-        self.open_user_score = 0
-
+    def __init__(self, wikidata: Dict[str, str]):
         # attributes to be filled by user
         self.my_score = 0
         self.goals = {}
+        #self.released = released # TODO verify compared to the current date with the release date
+        #self.purchase_date = purchase_date
+        #self.play_platform = playing_platform
+        # self.status = status
+        # self.hyped_level = hyped_level
 
-        self.metadata_sources: List[Dict]= [
-            {
-                'attribute': 'genre',
-                'selector': '',
-                'variable': self.genre
-            },
-            {
-                'attribute': 'developer',
-                'selector': '',
-                'variable': self.developer
-            },
-            {
-                'attribute': 'publisher',
-                'selector': '',
-                'variable': self.publisher
-            },
-            {
-                'attribute': 'meta_critics_score',
-                'selector': '',
-                'variable': self.meta_critics_score
-            },
-            {
-                'attribute': 'meta_user_score',
-                'selector': '',
-                'variable': self.meta_user_score
-            },
-            {
-                'attribute': 'open_critics_score',
-                'selector': '',
-                'variable': self.open_critics_score
-            },
-            {
-                'attribute': 'open_user_score',
-                'selector': '',
-                'variable': self.open_user_score
-            }
-        ]
+        # attributes to be filled automatically
+        ## from `WikiData`
 
-        self.fill_all_metadata()
+        self.wikipedia_link = wikidata['wikipedia_link']
+        self.wikidata_link = wikidata['wikidata_link']
+        self.genres = wikidata['genres']
+        self.developers = wikidata['developers']
+        self.publishers = wikidata['publishers']
+        self.release_date = wikidata['release_date'] # 
+        self.platforms = wikidata['platforms'] # TODO allow to select the platform
+        self.title = wikidata['title']
 
-    def _verify_title(self) -> str:
-        """Displays list of search result with the given game title."""
+        ## from `Metacritics`
+        self.meta_critics_score = 0
+        self.meta_user_score = 0
+        ## from `Opencritics`
+        self.open_critics_score = 0
+        self.open_user_score = 0
 
-        pass
+
+
+        # self.metadata_sources: List[Dict]= [
+        #     {
+        #         'attribute': 'genre',
+        #         'selector': '',
+        #         'variable': self.genre
+        #     },
+        #     {
+        #         'attribute': 'developer',
+        #         'selector': '',
+        #         'variable': self.developer
+        #     },
+        #     {
+        #         'attribute': 'publisher',
+        #         'selector': '',
+        #         'variable': self.publisher
+        #     },
+        #     {
+        #         'attribute': 'meta_critics_score',
+        #         'selector': '',
+        #         'variable': self.meta_critics_score
+        #     },
+        #     {
+        #         'attribute': 'meta_user_score',
+        #         'selector': '',
+        #         'variable': self.meta_user_score
+        #     },
+        #     {
+        #         'attribute': 'open_critics_score',
+        #         'selector': '',
+        #         'variable': self.open_critics_score
+        #     },
+        #     {
+        #         'attribute': 'open_user_score',
+        #         'selector': '',
+        #         'variable': self.open_user_score
+        #     }
+        # ]
 
 
     def _parse_date(self) -> None:
@@ -107,10 +105,4 @@ class Game:
         """Extract and store desired data by crawling the source URL."""
         pass
 
-    def _fill_all_metadata(self) -> None:
-        """Fills all the metadata"""
-
-        # for source in self.metadata_sources:
-        # _extract_metadata
-        pass
     
