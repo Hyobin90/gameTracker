@@ -1,15 +1,21 @@
-import aiohttp
-from aiohttp import client_exceptions
 import asyncio
-from SPARQLWrapper import SPARQLWrapper
-import xmltodict
-import requests
-from pprint import pprint
-from typing import List, Dict
-from lxml import etree
+from typing import List
 from SPARQLWrapper import JSON
 from async_sparql_wrapper import AsyncSparqlWrapper
 
+
+class Game():
+  def __init__(self, wikipiedia_link:str, wikidata_link:str, 
+               genres:str, developers:str, publishers:str,
+               release_date:str, platforms:str, title:str):
+    self.wikipedia_link = wikipiedia_link
+    self.wikidata_link = wikidata_link
+    self.genres = genres
+    self.developers = developers
+    self.publishers = publishers
+    self.release_date = release_date
+    self.platforms = platforms
+    self.title = title
 
 
 search_keyword = 'god of war'
@@ -77,33 +83,49 @@ async def test():
   sparql_wikidata.setQuery(query_game)
   sparql_wikidata.setReturnFormat(JSON)
   response = await sparql_wikidata.asyncQueryAndConvert()
-  pprint(response)
 
-asyncio.run(test())
-# async def run_sparql_query(query, sparql_url=wikidata_sparql_url) -> List[Dict]:
-#   async with aiohttp.ClientSession() as session:
-#     async with session.get(sparql_url, headers=headers, params=params) as response:
-#       if response.status == 200:
-#         xml_data = await response.text()
-#         json_data = xmltodict.parse(xml_data)
-#         # TODO parse `json_data` one more time manually
-#         pprint.pprint(json_data)
-#         print(type(json_data['sparql']['results']['result']))
-#         return json_data['sparql']['results']['result']
-#       else:
-#         print(f'Error {response.status} - {response.reason}')
-#         raise RuntimeError(response.reason)
+  wikipedia_link = '' # article
+  wikidata_link = '' # item
+  genres = '' # genres
+  developers = '' # developers
+  publishers = '' # publishers
+  release_date = '' # publicationDates # TODO find a way to tell dates per platform
+  platforms = '' # platforms
+  title = '' # titleLabel
+
+  target_keys = ['article', 'item', 'genres', 'developers', 'publishers', 
+                 'publicationDates', 'platforms', 'titleLabel']
+  
+  game_candiates: List[Game] = []
+
+  for element in response['results']['bindings']: # -> List of Dicts, `element` is a dict
+    if all(key in element for key in target_keys):
+      wikipedia_link = element['article']['value']
+      wikidata_link = element['item']['value']
+      genres = element['genres']['value']
+      developers = element['developers']['value']
+      publishers = element['publishers']['value']
+      release_date = element['publicationDates']['value']
+      platforms = element['platforms']['value']
+      title = element['titleLabel']['value']
+      candiate = Game(wikipedia_link, wikidata_link, genres, developers, publishers, release_date, platforms, title)
+      game_candiates.append(candiate)
+
+  return game_candiates
+
+game_candiates = asyncio.run(test())
+for candiate in game_candiates:
+  print(vars(candiate))
+  
+ 
+
+
+
+
     
 
-# async def process_sparql_query_result(search_keyword):
-#   bindings = await run_sparql_query(query=query_game)
-
-#   for binding in bindings:
-#     title = binding['binding']['@name']
-#     print(f'title : {title}')
 
 
-# asyncio.run(process_sparql_query_result(search_keyword))
 # TODO date without time
 # while True:
 #   search_keyword = input('Put the title of the game.\n')

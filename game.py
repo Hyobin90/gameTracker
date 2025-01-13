@@ -5,7 +5,7 @@ from enum import Enum
 import requests
 from typing import Any, Dict, List
 
-URL_WIKIPEDIA = 'https://en.wikipedia.org/'
+
 URL_METACRITIC = 'https://www.metacritic.com/game/'
 URL_OPENCRITIC = 'https://opencritic.com/game/'
 
@@ -37,12 +37,8 @@ class game:
         self.status = status
         self.hyped_level = hyped_level
 
-        self.url_wikipedia = self._construct_url(self.title, URL_WIKIPEDIA)
-        self.url_metacritic = self._construct_url(self.title, URL_METACRITIC)
-        self.url_opencritic = self._construct_url(self.title, URL_OPENCRITIC)
-
         # attributes to be filled automatically
-        # from `Wikipedia`
+        # from `WikiData`
         self.genre = ''
         self.developer = ''
         self.publisher = ''
@@ -63,43 +59,36 @@ class game:
             {
                 'attribute': 'genre',
                 'selector': '',
-                'url': f'{URL_WIKIPEDIA}',
                 'variable': self.genre
             },
             {
                 'attribute': 'developer',
                 'selector': '',
-                'url': '',
                 'variable': self.developer
             },
             {
                 'attribute': 'publisher',
                 'selector': '',
-                'url': '',
                 'variable': self.publisher
             },
             {
                 'attribute': 'meta_critics_score',
                 'selector': '',
-                'url': '',
                 'variable': self.meta_critics_score
             },
             {
                 'attribute': 'meta_user_score',
                 'selector': '',
-                'url': '',
                 'variable': self.meta_user_score
             },
             {
                 'attribute': 'open_critics_score',
                 'selector': '',
-                'url': '',
                 'variable': self.open_critics_score
             },
             {
                 'attribute': 'open_user_score',
                 'selector': '',
-                'url': '',
                 'variable': self.open_user_score
             }
         ]
@@ -107,20 +96,10 @@ class game:
         self.fill_all_metadata()
 
     def _verify_title(self) -> str:
-        """Verifies and corrects the given title on Wikipedia."""
-        # Search for the game with the given title on Wikipedia.
-        # Check if the game exists with the title
-        # if it doesn't exist, raise an error
-        # if the game exists but the title is not accurate
-        # find and put the correct name into `self.title`
-        # return complete_name
+        """Displays list of search result with the given game title."""
+
         pass
 
-    def _construct_url(self, title: str, url: str) -> str:
-        """Constructs the URL for the given website for the game"""
-        #complete_url = f'{url}/'
-        #return complete_url
-        pass
 
     def _parse_date(self) -> None:
         """Parses the date given as string into Date class"""
