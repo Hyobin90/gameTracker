@@ -1,9 +1,6 @@
 """ Defines `game` class"""
-from bs4 import BeautifulSoup
-import datetime
 from enum import Enum
-import requests
-from typing import Any, Dict, List
+from typing import Dict, List
 
 
 URL_METACRITIC = 'https://www.metacritic.com/game/'
@@ -27,7 +24,7 @@ class Status(Enum):
     # TODO in the client, the options for the status should be provided as a drop-down list
 
 # TODO with PSN API, would it be possible to add an entry automatically each time a game is purchased?
-class game:
+class Game:
     """A class to hold metadata on a game"""
     def __init__(self, title: str, released: bool, purchase_date: str, playing_platform: str, status: str, hyped_level: str):
         self.title = self._verify_title(title)
