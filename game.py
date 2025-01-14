@@ -30,6 +30,8 @@ class Game:
         # attributes to be filled by user
         self.my_score = 0
         self.goals = {}
+        #self.pro_enhanced: bool = False
+        #self.note
         #self.released = released # TODO verify compared to the current date with the release date
         #self.purchase_date = purchase_date
         #self.play_platform = playing_platform
