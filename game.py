@@ -1,6 +1,6 @@
 """ Defines `game` class"""
 from enum import Enum
-from typing import Dict, List
+from typing import Dict
 from datetime import datetime
 
 
@@ -9,8 +9,8 @@ URL_OPENCRITIC = 'https://opencritic.com/game/'
 
 class Platform(Enum):
     """Collections of platforms"""
-    PS4 = 'PlayStation 4'
-    PS5 = 'PlayStation 5'
+    PS4 = 'PS4'
+    PS5 = 'PS5'
 
 
 class Status(Enum):
@@ -24,12 +24,14 @@ class Status(Enum):
     PAUSED = 'paused'
     COMPLETED = 'completed as aimed'
 
+
 class Expectation(Enum):
     """Collection of the level of being excited about the game."""
     VERY_HIGH = 3
     HIGH = 2
     INTERESTED = 1
     NOTICING = 0
+
 
 class Goals(Enum):
     """Collections of frequently mentioned goals for the game."""
@@ -41,19 +43,9 @@ class Game:
     def __init__(self, personal_data: Dict[str, str], wikidata: Dict[str, str]):
         # attributes to be filled by user
         ## filled up initally
-        try:
-            self.purchase_date = datetime.strftime(personal_data['purchase_date'], '%Y-%m-%d')
-        except ValueError:
-            raise RuntimeError('The date format is not matched.')
-        if not (personal_data['play_platform'] == str(Platform.PS4.name) or 
-                (personal_data['play_platform'] == str(Platform.PS5.name))):
-            raise RuntimeError(f'Invalid platform was provided : {personal_data["play_platform"]}')
-        else:
-            self.play_platform = Platform(personal_data['play_platform'])
-        if not (0 <= int(personal_data['expectation']) <=3):
-            raise RuntimeError(f'Invalid expectation value was provided : {personal_data["expectation"]}')
-        else:
-            self.expectaion = Expectation(int(personal_data['expectation'])).value
+        self.purchase_date = datetime.strptime(personal_data['purchase_date'], '%Y-%m-%d')
+        self.play_platform = Platform(personal_data['play_platform'])
+        self.expectaion = Expectation(int(personal_data['expectation'])).value
         
         # TODO maybe with NoSQL implemented
         # self.goals = {}
@@ -84,14 +76,3 @@ class Game:
 
         # from `PSN API`?
         #self.pro_enhanced: bool = False
-
-
-    def _parse_date(self) -> None:
-        """Parses the date given as string into Date class"""
-        pass
-
-
-    def _extract_metadata(self, data_name: str, source_url: str) -> None:
-        """Extract and store desired data by crawling the source URL."""
-        pass
-
