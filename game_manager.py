@@ -11,73 +11,75 @@ from typing import Any, Dict, List
 wikidata_sparql_url = "https://query.wikidata.org/sparql"
 date_pattern = r'^\d{4}-\d{2}-\d{2}$'
 
-def search_target_game(search_title:str, search_page_num: int = 10, search_offset:int = 0) -> Game:
+async def search_target_game(search_title:str, search_page_num: int = 10, search_offset:int = 0) -> Game:
     try:
         if not search_title:
             search_title = input('Put the title of the game.\n')
 
-        response = asyncio.run(_search_games_in_metadata(search_title, search_page_num, search_offset))
+        response = await _search_games_in_wikidata(search_title, search_page_num, search_offset)
         game_candidates: List[Dict[str, str]] = _make_cadidate_list(response)
 
-        if len(game_candidates) == 0:
+        print(f'game_candidates: {game_candidates}')
+        if not game_candidates:
             search_title = input(f'Nothing has been found with {search_title}. Please try with another title.\n')
-            search_target_game(search_title, search_page_num, 0) # set the offset to 0 because this is a new search
+            await search_target_game(search_title, search_page_num, 0) # set the offset to 0 because this is a new search
 
         temp = []
         temp_index = 0
         for candiate in game_candidates:
             temp_index += 1
-            temp.append({'index' : temp_index, 'title' : candiate['title'], 'release_date' : candiate['release_date']})
+            temp.append({'index' : temp_index, 'title' : candiate['title'], 'platforms' : candiate['platforms'], 'release_date' : candiate['release_date'][:10]})
         
         print('Choose the desired game from the list.')
         print(tabulate(temp, headers='keys', tablefmt='rounded_outline'))
+        purchase_date = None
+        play_platform = None
+        expectation = None
 
         while True:
-            try:
+            while True:
+              try:
                 choice = int(input('Enter the number of the game that you want.\nIf the desired is not present in the list, press 0.\n'))
-                if 1 <= choice <= len(temp):
-                    print(f'You selected {temp[choice-1]['title']} of {temp[choice-1]['release_date']}')
-                    purchase_date = None
-                    play_platform = None
-                    expectation = None
-                    while True:
-                        purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\n')
-                        if not re.match(date_pattern, purchase_date):
-                            print(f'Wrong date format: {purchase_date}')
+              except ValueError as e:
+                choice = int(input('Enter the number of the game that you want.\nIf the desired is not present in the list, press 0.\n'))
+                continue 
+              break
+            if 1 <= choice <= len(temp):
+                print(f'You selected {temp[choice-1]['title']} of {temp[choice-1]['release_date']}')
+
+                while True:
+                    purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\n')
+                    if not re.match(date_pattern, purchase_date):
+                        print(f'Wrong date format: {purchase_date}')
+                        continue
+                    break
+                while True:
+                    play_platform = input('Please put the device you play this game on between PS4 and PS5.\n')
+                    if play_platform not in ('PS4', 'PS5'):
+                        print(f'Wrong platform: {play_platform}')
+                        continue
+                    break
+                while True:
+                    try:
+                        expectation = int(input('Please put your expectation on this game from 0 to 3, the higher, the more hyped.\n'))
+                        if (expectation > 3) or (expectation < 0):
+                            print(f'Invalid value for the expectation: {expectation}')
                             continue
                         break
-                    while True:
-                        play_platform = input('Please put the device you play this game on between PS4 and PS5.\n')
-                        if play_platform not in ('PS4', 'PS5'):
-                            print(f'Wrong platform: {play_platform}')
-                            continue
-                        break
-                    while True:
-                        try:
-                            expectation = int(input('Please put your expectation on this game from 0 to 3, the higher, the more hyped.\n'))
-                            if (expectation > 3) or (expectation < 0):
-                                print(f'Invalid value for the expectation: {expectation}')
-                                continue
-                            break
-                        except ValueError as e:
-                            print(f'Please enter a valid integer.')
-                            continue
-                    personal_data: Dict = {'purchase_date': purchase_date, 'play_platform': play_platform, 'expectation': expectation}
-                    return Game(personal_data=personal_data, wikidata=game_candidates[choice - 1]) # TODO GTPS-006 expect data other than metadata
-
-                if choice == 0:
-                    search_target_game(search_title, search_page_num, search_offset+search_page_num)
-                else:
-                    print(f'Please enter a valid number.')
-            except ValueError as e:
-                print(f'Invalid input. : {e}')
-
+                    except ValueError as e:
+                        print(f'Please enter a valid integer.')
+                        continue
+            elif choice == 0:
+                await search_target_game(search_title, search_page_num, search_offset + search_page_num)
+            break
+        personal_data: Dict = {'purchase_date': purchase_date, 'play_platform': play_platform, 'expectation': expectation}
+        return Game(personal_data=personal_data, wikidata=game_candidates[choice - 1]) # TODO GTPS-006 expect data other than metadata
     # error catching for SPARQL query
     except Exception as e:
         print(f'Error occurred : {e}')
 
 
-async def _search_games_in_metadata(search_title:str, search_page_num: int = 10, search_offset:int = 0) -> Any:
+async def _search_games_in_wikidata(search_title:str, search_page_num: int = 10, search_offset:int = 0) -> Any:
   '''Sends SPARQL query to `Metadata` for a game and returns the response.
   
   Args:
@@ -90,12 +92,11 @@ async def _search_games_in_metadata(search_title:str, search_page_num: int = 10,
 
   '''
   query_game = f"""
-  SELECT DISTINCT ?item ?itemLabel ?article ?titleLabel
+  SELECT DISTINCT ?item ?itemLabel ?article ?titleLabel ?publicationDateLabel
+        (GROUP_CONCAT(DISTINCT ?platformLabel; separator=", ") AS ?platforms)
         (GROUP_CONCAT(DISTINCT ?genreLabel; separator=", ") AS ?genres)
         (GROUP_CONCAT(DISTINCT ?developerLabel; separator=", ") AS ?developers)
         (GROUP_CONCAT(DISTINCT ?publisherLabel; separator=", ") AS ?publishers)
-        (GROUP_CONCAT(DISTINCT ?publicationDateLabel; separator=", ") AS ?publicationDates)
-        (GROUP_CONCAT(DISTINCT ?platformLabel; separator=", ") AS ?platforms)
   WHERE {{
     ?item wdt:P31 wd:Q7889;
           rdfs:label ?label.
@@ -109,14 +110,14 @@ async def _search_games_in_metadata(search_title:str, search_page_num: int = 10,
       ?item wdt:P1476 ?titleLabel.
     }}
     OPTIONAL {{
-      ?item wdt:P577 ?publicationDateLabel.
-    }}
+      ?item p:P577 ?publicationDateNode.
+      ?publicationDateNode ps:P577 ?publicationDateLabel.
       OPTIONAL {{
-      ?item wdt:P400 ?platform.
-      ?platform rdfs:label ?platformLabel.
-      FILTER(LANG(?platformLabel) = "en").
-      FILTER(CONTAINS(LCASE(?platformLabel), "playstation 4") || CONTAINS(LCASE(?platformLabel), "playstation 5")).
-
+        ?publicationDateNode pq:P400 ?platformNode.
+        ?platformNode rdfs:label ?platformLabel.
+        FILTER(LANG(?platformLabel) = "en").
+        FILTER(CONTAINS(LCASE(?platformLabel), "playstation 4") || CONTAINS(LCASE(?platformLabel), "playstation 5")).
+      }}
     }}
     OPTIONAL {{
       ?item wdt:P136 ?genre.
@@ -134,7 +135,7 @@ async def _search_games_in_metadata(search_title:str, search_page_num: int = 10,
       FILTER(LANG(?publisherLabel) = "en").
     }}
   }}
-  GROUP BY ?item ?itemLabel ?article ?titleLabel
+  GROUP BY ?item ?itemLabel ?article ?titleLabel ?publicationDateLabel
   LIMIT {search_page_num}
   OFFSET {search_offset}
   """
@@ -171,7 +172,7 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
   title = '' # titleLabel
 
   target_keys = ['article', 'item', 'genres', 'developers', 'publishers', 
-                 'publicationDates', 'platforms', 'titleLabel']
+                 'publicationDateLabel', 'platforms', 'titleLabel']
   
   game_candiates: List[Dict[str, str]] = []
 
@@ -182,7 +183,7 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
       genres = element['genres']['value']
       developers = element['developers']['value']
       publishers = element['publishers']['value']
-      release_date = element['publicationDates']['value']
+      release_date = element['publicationDateLabel']['value']
       platforms = element['platforms']['value']
       title = element['titleLabel']['value']
 

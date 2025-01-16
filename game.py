@@ -63,7 +63,7 @@ class Game:
         self.genres = wikidata['genres']
         self.developers = wikidata['developers']
         self.publishers = wikidata['publishers']
-        self.release_date = wikidata['release_date'] # 
+        self.release_date = datetime.strptime(wikidata['release_date'][:10], '%Y-%m-%d')
         self.platforms = wikidata['platforms'] # TODO allow to select the platform
         self.title = wikidata['title']
 
