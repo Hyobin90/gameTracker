@@ -4,6 +4,8 @@ import argparse
 from game_manager import search_target_game
 
 
+asyncio.run(search_target_game('witcher 4'))
+
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(description='Register your game of interest')
     

@@ -19,7 +19,7 @@ async def search_target_game(search_title:str, search_page_num: int = 10, search
         response = await _search_games_in_wikidata(search_title, search_page_num, search_offset)
         game_candidates: List[Dict[str, str]] = _make_cadidate_list(response)
 
-        print(f'game_candidates: {game_candidates}')
+        print(f'game_candidates : {game_candidates}')
         if not game_candidates:
             search_title = input(f'Nothing has been found with {search_title}. Please try with another title.\n')
             await search_target_game(search_title, search_page_num, 0) # set the offset to 0 because this is a new search
@@ -98,8 +98,9 @@ async def _search_games_in_wikidata(search_title:str, search_page_num: int = 10,
         (GROUP_CONCAT(DISTINCT ?developerLabel; separator=", ") AS ?developers)
         (GROUP_CONCAT(DISTINCT ?publisherLabel; separator=", ") AS ?publishers)
   WHERE {{
-    ?item wdt:P31 wd:Q7889;
-          rdfs:label ?label.
+    ?item wdt:P31 ?type.
+    VALUES ?type {{ wd:Q7889 wd:Q64170203 }}.
+    ?item rdfs:label ?label.
     FILTER(CONTAINS(LCASE(?label), "{search_title}")).
     OPTIONAL {{
       ?article schema:about ?item;
@@ -174,8 +175,9 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
   platforms = '' # platforms
   title = '' # titleLabel
 
-  target_keys = ['article', 'item', 'genres', 'developers', 'publishers', 
-                 'publicationDateLabel', 'platforms', 'titleLabel']
+  # target_keys = ['article', 'item', 'genres', 'developers', 'publishers', 
+  #                'publicationDateLabel', 'platforms', 'titleLabel']
+  target_keys = ['article', 'item', 'titleLabel']
   
   game_candiates: List[Dict[str, str]] = []
 
