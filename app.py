@@ -4,11 +4,6 @@ import argparse
 from game_manager import search_target_game
 
 
-# def main():
-#     asyncio.run(search_target_game('star wars jedi: survivor'))
-
-# main()
-
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(description='Register your game of interest')
     

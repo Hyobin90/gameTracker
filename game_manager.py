@@ -111,6 +111,9 @@ async def _search_games_in_wikidata(search_title:str, search_page_num: int = 10,
     }}
     OPTIONAL {{
       ?item p:P577 ?publicationDateNode.
+      FILTER NOT EXISTS {{
+        ?publicationDateNode pq:P2241 ?deprecationReason
+      }}
       ?publicationDateNode ps:P577 ?publicationDateLabel.
       OPTIONAL {{
         ?publicationDateNode pq:P400 ?platformNode.
