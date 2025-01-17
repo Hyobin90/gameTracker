@@ -8,21 +8,37 @@ from tabulate import tabulate # temp mesure for user interaction
 from typing import Any, Dict, List
 
 
-wikidata_sparql_url = "https://query.wikidata.org/sparql"
+URL_METACRITIC = 'https://www.metacritic.com/game/'
+URL_OPENCRITIC = 'https://opencritic.com/game/'
+WIKIDATA_SPARQL_URL = "https://query.wikidata.org/sparql"
 date_pattern = r'^\d{4}-\d{2}-\d{2}$'
 
 async def search_target_game(search_title:str, search_page_num: int = 10, search_offset:int = 0) -> Game:
     try:
-        if not search_title:
-            search_title = input('Put the title of the game.\n')
+        candidate_loop_count = 0
+        candidate_loop_limit = 3
 
-        response = await _search_games_in_wikidata(search_title, search_page_num, search_offset)
-        game_candidates: List[Dict[str, str]] = _make_cadidate_list(response)
+        while candidate_loop_count < candidate_loop_limit:
+          if not search_title:
+              search_title = input('Put the title of the game.\n')
+          response = await _search_games_in_wikidata(search_title, search_page_num, search_offset) # Be careful with search_offset.
+          game_candidates: List[Dict[str, str]] = _make_cadidate_list(response)
 
-        print(f'game_candidates : {game_candidates}')
-        if not game_candidates:
-            search_title = input(f'Nothing has been found with {search_title}. Please try with another title.\n')
-            await search_target_game(search_title, search_page_num, 0) # set the offset to 0 because this is a new search
+          print(f'game_candidates : {game_candidates}') # For debugging
+
+          if not game_candidates:
+              search_title = input(f'Nothing has been found with {search_title}. Please try with another title.\n')
+              candidate_loop_count += 1
+              continue
+          break
+
+        # Ask to create a Game instance manually when no matched candiadates are found after 3 times of searching
+        if candidate_loop_count >= candidate_loop_limit:
+           print('The game cannot be found in `WikiData` for its metadata now.\nCreate the entry manually. Please check the ')
+           _create_game_manually()
+
+        # TODO ask to create an entry manually -> a new attribute in Game class that marks this instance is created manually
+        
 
         temp = []
         temp_index = 0
@@ -41,12 +57,13 @@ async def search_target_game(search_title:str, search_page_num: int = 10, search
               try:
                 choice = int(input('Enter the number of the game that you want.\nIf the desired is not present in the list, press 0.\n'))
               except ValueError as e:
-                choice = int(input('Enter the number of the game that you want.\nIf the desired is not present in the list, press 0.\n'))
+                choice = int(input('Please enter a valid number.\nIf the desired is not present in the list, press 0.\n'))
                 continue 
               break
-            if 1 <= choice <= len(temp):
+            if choice == 0:
+                await search_target_game(search_title, search_page_num, search_offset + search_page_num)
+            elif 1 <= choice <= len(temp):
                 print(f'You selected {temp[choice-1]['title']} of {temp[choice-1]['release_date']}')
-
                 while True:
                     purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\n')
                     if not re.match(date_pattern, purchase_date):
@@ -69,9 +86,8 @@ async def search_target_game(search_title:str, search_page_num: int = 10, search
                     except ValueError as e:
                         print(f'Please enter a valid integer.')
                         continue
-            elif choice == 0:
-                await search_target_game(search_title, search_page_num, search_offset + search_page_num)
             break
+
         personal_data: Dict = {'purchase_date': purchase_date, 'play_platform': play_platform, 'expectation': expectation}
         return Game(personal_data=personal_data, wikidata=game_candidates[choice - 1]) # TODO GTPS-006 expect data other than metadata
     # error catching for SPARQL query
@@ -144,7 +160,7 @@ async def _search_games_in_wikidata(search_title:str, search_page_num: int = 10,
   OFFSET {search_offset}
   """
 
-  sparql_wikidata = AsyncSparqlWrapper(wikidata_sparql_url)
+  sparql_wikidata = AsyncSparqlWrapper(WIKIDATA_SPARQL_URL)
   sparql_wikidata.setQuery(query_game)
   sparql_wikidata.setReturnFormat(JSON)
   result = await sparql_wikidata.asyncQuery()
@@ -182,7 +198,7 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
   game_candiates: List[Dict[str, str]] = []
 
   for element in sparql_response['results']['bindings']: # -> List of Dicts, `element` is a dict
-    if all(key in element for key in target_keys):
+    if all(key in element for key in target_keys): # Lower the level of detail here
       wikipedia_link = element['article']['value']
       wikidata_link = element['item']['value']
       genres = element['genres']['value']
@@ -205,3 +221,9 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
       game_candiates.append(candiate)
 
   return game_candiates
+
+
+def _create_game_manually() -> Game:
+   """Creates an instance of `Game` class by allowing the user to enter data manually."""
+
+   return Game()

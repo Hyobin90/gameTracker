@@ -4,9 +4,6 @@ from typing import Dict
 from datetime import datetime
 
 
-URL_METACRITIC = 'https://www.metacritic.com/game/'
-URL_OPENCRITIC = 'https://opencritic.com/game/'
-
 class Platform(Enum):
     """Collections of platforms"""
     PS4 = 'PS4'
@@ -40,39 +37,72 @@ class Goals(Enum):
 
 class Game:
     """A class to hold metadata on a game"""
-    def __init__(self, personal_data: Dict[str, str], wikidata: Dict[str, str]):
-        # attributes to be filled by user
-        ## filled up initally
-        self.purchase_date = datetime.strptime(personal_data['purchase_date'], '%Y-%m-%d')
-        self.play_platform = Platform(personal_data['play_platform'])
-        self.expectaion = Expectation(int(personal_data['expectation'])).value
-        
-        # TODO maybe with NoSQL implemented
+    def __init__(self, title:str, purchase_date:str, play_platform:str, expection:int, manually_created:bool = False):
+        # Necessary data on the game
+        self.title = title
+        self.purchase_date = datetime.strptime(purchase_date, '%Y-%m-%d')
+        self.play_platform = Platform(play_platform)
+        self.expectaion = Expectation(int(expection)).value
+        self.manually_created = manually_created
+
+        # Data from `Wikidata`
+        self.wikipedia_link = ''
+        self.wikidata_link = ''
+        self.genres = ''
+        self.developers = ''
+        self.publishers = ''
+        self.release_date = None
+        self.platforms = ''
+        self.title = ''
+        self.logo = None
+
+        # Data to be filled after playing # TODO maybe with NoSQL implemented
+        self.goals = {}
+        self.note = ''
+        self.my_score = 0
+
+        ## Data from `Metacritics`
+        self.meta_critics_score = 0
+        self.meta_user_score = 0
+        ## Data from `Opencritics`
+        self.open_critics_score = 0
+        self.open_user_score = 0
+
+        # Data from `PSN API`
+        self.pro_enhanced: bool = False
+
+        # Attributes to be updated automatically
+        # self.released = released # TODO verify compared to the current date with the release date
+        # self.status = status
+
+    def fill_metadata_wikidata(self, wikidata:Dict[str, str]):
+        """Fills up the metadata from `Wikidata` """
+        self.wikipedia_link = wikidata.get('wikipedia_link')
+        self.wikidata_link = wikidata.get('wikidata_link')
+        self.genres = wikidata.get('genres')
+        self.developers = wikidata.get('developers')
+        self.publishers = wikidata.get('publishers')
+        self.release_date = datetime.strptime(wikidata.get('release_date')[:10], '%Y-%m-%d') #TODO error handling is required
+        self.platforms = wikidata.get('platforms') # TODO allow to select the platform
+        self.title = wikidata.get('title')
+        #self.logo = wikidata.get('logo') # TODO handle the logo image
+
+    def fill_post_playing_data(self):
+        """Fills up certain data after playing"""
+        pass
         # self.goals = {}
         # self.note = ''
         # self.my_score = 0
 
-        # attributes to be filled automatically
-        ## updated automatically
-        # self.released = released # TODO verify compared to the current date with the release date
-        # self.status = status
-        
-        ## from `WikiData`
-        self.wikipedia_link = wikidata['wikipedia_link']
-        self.wikidata_link = wikidata['wikidata_link']
-        self.genres = wikidata['genres']
-        self.developers = wikidata['developers']
-        self.publishers = wikidata['publishers']
-        self.release_date = datetime.strptime(wikidata['release_date'][:10], '%Y-%m-%d')
-        self.platforms = wikidata['platforms'] # TODO allow to select the platform
-        self.title = wikidata['title']
+    def fill_meta_score(self):
+        """Retrieve critics score and user score from `Metacritic`"""
+        pass
+        # self.play_platform # it will be needed for `Metacritic`
+        # self.meta_critics_score = 0
+        # self.meta_user_score = 0
 
-        ## from `Metacritics`
-        self.meta_critics_score = 0
-        self.meta_user_score = 0
-        ## from `Opencritics`
-        self.open_critics_score = 0
-        self.open_user_score = 0
-
-        # from `PSN API`?
-        #self.pro_enhanced: bool = False
+    def fill_open_score(self):
+        """Retrieve critics score and user score from `Opencritic`"""
+        pass
+        # self.open_critics_score = 0
+        # self.open_user_score = 0
