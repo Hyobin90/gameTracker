@@ -37,13 +37,13 @@ class Goals(Enum):
 
 class Game:
     """A class to hold metadata on a game"""
-    def __init__(self, title:str, purchase_date:str, play_platform:str, expection:int, manually_created:bool = False):
+    def __init__(self, title:str, purchase_date:str, play_platform:str, expectation:int, use_wikidata:bool, wikidata =Dict[str, str]):
         # Necessary data on the game
         self.title = title
         self.purchase_date = datetime.strptime(purchase_date, '%Y-%m-%d')
         self.play_platform = Platform(play_platform)
-        self.expectaion = Expectation(int(expection)).value
-        self.manually_created = manually_created
+        self.expectaion = Expectation(int(expectation)).value
+        self.use_wikidata = use_wikidata
 
         # Data from `Wikidata`
         self.wikipedia_link = ''
@@ -75,7 +75,10 @@ class Game:
         # self.released = released # TODO verify compared to the current date with the release date
         # self.status = status
 
-    def fill_metadata_wikidata(self, wikidata:Dict[str, str]):
+        if use_wikidata:
+            self.fill_metadata_from_wikidata(wikidata)
+
+    def fill_metadata_from_wikidata(self, wikidata:Dict[str, str]):
         """Fills up the metadata from `Wikidata` """
         self.wikipedia_link = wikidata.get('wikipedia_link')
         self.wikidata_link = wikidata.get('wikidata_link')
@@ -84,7 +87,6 @@ class Game:
         self.publishers = wikidata.get('publishers')
         self.release_date = datetime.strptime(wikidata.get('release_date')[:10], '%Y-%m-%d') #TODO error handling is required
         self.platforms = wikidata.get('platforms') # TODO allow to select the platform
-        self.title = wikidata.get('title')
         #self.logo = wikidata.get('logo') # TODO handle the logo image
 
     def fill_post_playing_data(self):
