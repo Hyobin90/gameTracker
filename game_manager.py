@@ -24,12 +24,12 @@ async def create_target_game_entry(search_title: str, search_page_num: int = 10,
 
         while candidate_loop_count < candidate_loop_limit:
             if not search_title:
-                search_title = input('Put the title of the game.\n')
+                search_title = input('Put the title of the game.\n').lower()
 
             # Try to get metadata of the game in `Wikidata
             response = await _search_games_in_wikidata(search_title, search_page_num, search_offset)  # Be careful with search_offset.
             game_candidates = _make_cadidate_list(response)
-            print(f'game_candidates : {game_candidates}')  # For debugging
+            print(f'For debugging, game_candidates : {game_candidates}')  # For debugging
 
             if not game_candidates:
                 search_title = input(f'Nothing has been found with {search_title}. Please try agin or with another title.\n')
@@ -38,7 +38,7 @@ async def create_target_game_entry(search_title: str, search_page_num: int = 10,
             break
         
         if game_candidates:
-            selected_candidate = _display_game_candidates(game_candidates, search_title)
+            selected_candidate = await _display_game_candidates(game_candidates, search_title, search_page_num, search_offset)
 
         game_of_interest = _create_game_entry(selected_candidate)
         return game_of_interest
@@ -114,7 +114,7 @@ async def _search_games_in_wikidata(search_title: str, search_page_num: int = 10
     """
 
     sparql_wikidata = AsyncSparqlWrapper(WIKIDATA_SPARQL_URL)
-    sparql_wikidata.addCustomHeader("User-Agent", "YourAppName/1.0 (your_email@example.com)")
+    sparql_wikidata.addCustomHttpHeader("User-Agent", "game_tracker (hyobin90@gmail.com)")
     sparql_wikidata.setQuery(query_game)
     sparql_wikidata.setReturnFormat(JSON)
     result = await sparql_wikidata.asyncQuery()

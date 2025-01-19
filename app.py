@@ -4,7 +4,7 @@ import argparse
 from game_manager import create_target_game_entry
 
 
-asyncio.run(create_target_game_entry('dynasty warrior origin'))
+asyncio.run(create_target_game_entry('god of war ragnarok'))
 
 # if __name__ == '__main__':
 #     arg_parser = argparse.ArgumentParser(description='Register your game of interest')
