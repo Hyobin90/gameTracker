@@ -2,6 +2,7 @@
 from enum import Enum
 from typing import Dict
 from datetime import datetime
+import re
 
 
 class Platform(Enum):
@@ -13,11 +14,13 @@ class Platform(Enum):
 class Status(Enum):
     """Collectons of current status of a game."""
     ANNOUNCED = 'announced'
-    COMMING = 'comming' 
-    COMMING_SOON = 'comming soon' # GTPS-010 Allow the user to define the sense of how soon
+    COMING = 'coming' 
+    COMING_SOON = 'coming soon' # GTPS-010 Allow the user to define the sense of how soon
+    # PREORDER_AVAILABLE = 'pre-order available' # TODO Find out if it's to be retrieved from PSN update
+    PREORDERED = 'pre-oredered'
     RELEASED = 'released'
-    PURCHASE = 'purchased'
-    PLAYING = 'playing'
+    PURCHASED = 'purchased'
+    PLAYING = 'currently playing'
     PAUSED = 'paused'
     COMPLETED = 'completed as aimed'
 
@@ -35,15 +38,16 @@ class Goals(Enum):
     ALL_TRPOHYIES = 'all_trophies'
 
 
+
 class Game:
     """A class to hold metadata on a game"""
-    def __init__(self, title:str, purchase_date:str, play_platform:str, expectation:int, use_wikidata:bool, wikidata =Dict[str, str]):
+    def __init__(self, title:str, use_wikidata:bool, wikidata =Dict[str, str]):
         # Necessary data on the game
         self.title = title
-        self.purchase_date = datetime.strptime(purchase_date, '%Y-%m-%d')
-        self.play_platform = Platform(play_platform)
-        self.expectaion = Expectation(int(expectation)).value
         self.use_wikidata = use_wikidata
+
+        # Data from the user
+        self.purchase_date = None
 
         # Data from `Wikidata`
         self.wikipedia_link = ''
@@ -72,11 +76,103 @@ class Game:
         self.pro_enhanced: bool = False
 
         # Attributes to be updated automatically
-        # self.released = released # TODO verify compared to the current date with the release date
-        # self.status = status
+        self.released = self._is_released()
+        self.purchased = None
+        self.playing = None
+        self.played = None
+        self.status: Status = None
 
         if use_wikidata:
             self.fill_metadata_from_wikidata(wikidata)
+
+
+    def update_status(self) -> None:
+        """Centralizes updating the status of the game based on `released`, `purchased`, and `playing`"""
+        if not self.release_date:
+            self.status = Status.ANNOUNCED
+            return
+
+        days_till_release = self._calculate_days_till_release()
+        if not self.released:
+            if self.purchased:
+                self.status = Status.PREORDERED
+            elif days_till_release > 180:
+                self.status = Status.COMING
+            elif days_till_release <= 180:
+                self.status = Status.COMING_SOON
+            return
+        
+        if self.released:
+            if self.purchased and self.playing:
+                self.status = Status.PLAYING
+            elif self.purchased and not self.playing and self.played:
+                self.status = Status.PAUSED
+            elif self.purchased:
+                self.status = Status.PURCHASED
+            else:
+                self.status = Status.RELEASED
+
+
+    def set_purchase(self) -> None:
+        """Sets the purchase date and purchase related status."""
+        # TODO this can be called when the game is purchased before or after released.
+        while True:
+            purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\nPlease enter 0, if you haven\'t purchased the game yet.')
+            if purchase_date == 0:
+                self.purchased = False
+                break
+            elif _validate_date_format(purchase_date):
+                self.purchase_date = datetime.strptime(purchase_date, '%Y-%m-%d')
+                self.purchased = True
+                break
+            else:
+                print(f'Wrong date format: {purchase_date}')
+                continue
+        self.update_status()
+
+        
+    def set_play_platform(self) -> None:
+        """Sets the play platform."""
+        # TODO this can be called each time the user wants to change the value.
+        while True:
+            play_platform = input('Please put the device you play this game on between PS4 and PS5.\n')
+            if play_platform not in Platform:
+                print(f'Wrong platform: {play_platform}')
+                continue
+            break
+        self.play_platform = Platform(play_platform)
+
+    
+    def set_expectation(self) -> None:
+        """Sets the user expectation on the game."""
+        # TODO this can be called each time the user wants to change the value.
+        while True:
+            try:
+                expectation = int(input('Please put your expectation on this game from 0 to 3, the higher, the more hyped.\n'))
+                if (expectation > 3) or (expectation < 0):
+                    print(f'Invalid value for the expectation: {expectation}')
+                    continue
+                break
+            except ValueError:
+                print(f'Please enter a valid integer.')
+                continue
+        self.expectaion = Expectation(int(expectation)).value
+
+
+    def set_game_active(self) ->  None:
+        """Set the game currently playing."""
+        if self.purchased:
+            self.playing = True
+            self.played = True
+            self.update_status()
+
+
+    def set_game_inactive(self) -> None:
+        """Set the game paused."""
+        if self.purchased and self.playing:
+            self.playing = False
+            self.update_status()
+
 
     def fill_metadata_from_wikidata(self, wikidata:Dict[str, str]):
         """Fills up the metadata from `Wikidata` """
@@ -89,12 +185,37 @@ class Game:
         self.platforms = wikidata.get('platforms') # TODO allow to select the platform
         #self.logo = wikidata.get('logo') # TODO handle the logo image
 
+
+    def _is_released(self) -> bool:
+        """Verifies whether a game has been released."""
+        # TODO this should be called each time the game is requested
+        current_date = datetime.today().strftime('%Y-%m-%d')
+        if not self.release_date:
+            self.released = False
+        elif self.release_date:
+            if self.release_date <= current_date:
+                self.released = True
+            else:
+                self.released = False
+        self.update_status()
+
+
+    def _calculate_days_till_release(self) -> int:
+        """Verifies if the game will be released soon."""
+        if not self.release_date:
+            raise RuntimeError('Even no release date has been announced.')
+        else:
+            current_date = datetime.today().strftime('%Y-%m-%d')
+            return abs(self.release_date - current_date).days
+        
+
     def fill_post_playing_data(self):
         """Fills up certain data after playing"""
         pass
         # self.goals = {}
         # self.note = ''
         # self.my_score = 0
+
 
     def fill_meta_score(self):
         """Retrieve critics score and user score from `Metacritic`"""
@@ -103,8 +224,18 @@ class Game:
         # self.meta_critics_score = 0
         # self.meta_user_score = 0
 
+
     def fill_open_score(self):
         """Retrieve critics score and user score from `Opencritic`"""
         pass
         # self.open_critics_score = 0
         # self.open_user_score = 0
+                
+
+def _validate_date_format(value):
+    """Validate if `value` consolidates the desired date pattern."""
+    date_pattern = r'^\d{4}-\d{2}-\d{2}$'
+    if re.match(date_pattern, value):
+        return True
+    else:
+        return False

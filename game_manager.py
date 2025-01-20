@@ -1,5 +1,4 @@
 """Manage games by registering, and updating them."""
-import asyncio
 from async_sparql_wrapper import AsyncSparqlWrapper
 from game import Game
 import re
@@ -228,9 +227,6 @@ def _create_game_entry(selected_candidate: Dict[str, str]) -> Game:
     """
     game_of_interest: Game = None
     title = ''
-    purchase_date = ''
-    play_platform = ''
-    expectation = ''
     use_wikidata = False
 
     if selected_candidate:
@@ -240,31 +236,10 @@ def _create_game_entry(selected_candidate: Dict[str, str]) -> Game:
         print('The game cannot be found in `WikiData` for its metadata now.\nCreate the entry manually. Missing details can be filled up later.')
         title = input('Please enter the game\'s full title.')
 
-    while True:
-        purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\n')
-        if not re.match(date_pattern, purchase_date):
-            print(f'Wrong date format: {purchase_date}')
-            continue
-        break
-
-    while True:
-        play_platform = input('Please put the device you play this game on between PS4 and PS5.\n')
-        if play_platform not in ('PS4', 'PS5'):
-            print(f'Wrong platform: {play_platform}')
-            continue
-        break
-
-    while True:
-        try:
-            expectation = int(input('Please put your expectation on this game from 0 to 3, the higher, the more hyped.\n'))
-            if (expectation > 3) or (expectation < 0):
-                print(f'Invalid value for the expectation: {expectation}')
-                continue
-            break
-        except ValueError:
-            print(f'Please enter a valid integer.')
-            continue
-
-    game_of_interest = Game(title, purchase_date, play_platform, expectation, use_wikidata, selected_candidate)
+    game_of_interest = Game(title, use_wikidata, selected_candidate)
+    game_of_interest.set_purchase()
+    game_of_interest.set_play_platform()
+    game_of_interest.set_expectation()
+    # Obtain critic scores
 
     return game_of_interest
