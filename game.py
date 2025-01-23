@@ -47,23 +47,21 @@ class Game:
         self.use_wikidata = use_wikidata
 
         # Data from the user
-        self.purchase_date = None
+        self.purchase_date = None # this is not stored in game_db
 
         # Data from `Wikidata`
-        self.wikipedia_link = ''
-        self.wikidata_link = ''
+        self.wikidata_code = ''
         self.genres = ''
         self.developers = ''
         self.publishers = ''
         self.release_date = None
         self.platforms = ''
-        self.title = ''
-        self.logo = None
+        self.my_score = 0
 
         # Data to be filled after playing # TODO maybe with NoSQL implemented
         self.goals = {}
         self.note = ''
-        self.my_score = 0
+        self.logo = None # but from `Wikidata``
 
         ## Data from `Metacritics`
         self.meta_critics_score = 0
@@ -75,7 +73,7 @@ class Game:
         # Data from `PSN API`
         self.pro_enhanced: bool = False
 
-        # Attributes to be updated automatically
+        # Attributes to be updated per user, stored in their DB, not stored in game_db
         self.released = self._is_released()
         self.purchased = None
         self.playing = None

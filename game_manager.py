@@ -240,6 +240,7 @@ def _create_game_entry(selected_candidate: Dict[str, str]) -> Game:
     game_of_interest.set_purchase()
     game_of_interest.set_play_platform()
     game_of_interest.set_expectation()
-    # Obtain critic scores
+    game_of_interest.fill_meta_score()
+    game_of_interest.fill_open_score()
 
     return game_of_interest

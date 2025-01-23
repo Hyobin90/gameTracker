@@ -1,0 +1,20 @@
+CREATE DATABASE IF NOT EXISTS game_db;
+USE game_db;
+CREATE TABLE IF NOT EXISTS game_table (
+	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+	wikidata_code VARCHAR(100) UNIQUE,
+    genres VARCHAR(1024),
+    developers VARCHAR(255),
+    publishers VARCHAR(255),
+    release_date DATE,
+    released BOOLEAN,
+    platforms VARCHAR(255),
+    pro_enhanced BOOLEAN,
+    meta_critic_score INT UNSIGNED,
+    meta_user_score FLOAT UNSIGNED,
+	open_critic_score INT UNSIGNED,
+    open_user_score FLOAT UNSIGNED,
+    my_score INT UNSIGNED
+);
+
