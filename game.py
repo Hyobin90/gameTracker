@@ -41,10 +41,10 @@ class Goals(Enum):
 
 class Game:
     """A class to hold metadata on a game"""
-    def __init__(self, title:str, use_wikidata:bool, wikidata =Dict[str, str]):
+    def __init__(self, title:str, manually_created:bool, wikidata =Dict[str, str]):
         # Necessary data on the game
         self.title = title
-        self.use_wikidata = use_wikidata
+        self.manually_created = manually_created
 
         # Data from the user
         self.purchase_date = None # this is not stored in game_db
@@ -74,48 +74,51 @@ class Game:
         self.pro_enhanced: bool = False
 
         # Attributes to be updated per user, stored in their DB, not stored in game_db
-        self.released = self._is_released()
         self.purchased = None
         self.playing = None
         self.played = None
         self.status: Status = None
 
-        if use_wikidata:
-            self.fill_metadata_from_wikidata(wikidata)
+        if not manually_created:
+            self.fill_metadata_from_wikidata(wikidata) #TODO GTPS-59 prioritize the gameDB
 
 
     def update_status(self) -> None:
         """Centralizes updating the status of the game based on `released`, `purchased`, and `playing`"""
-        if not self.release_date:
-            self.status = Status.ANNOUNCED
-            return
+        try:
+            if not self.release_date:
+                self.status = Status.ANNOUNCED
+                return
 
-        days_till_release = self._calculate_days_till_release()
-        if not self.released:
-            if self.purchased:
-                self.status = Status.PREORDERED
-            elif days_till_release > 180:
-                self.status = Status.COMING
-            elif days_till_release <= 180:
-                self.status = Status.COMING_SOON
-            return
-        
-        if self.released:
-            if self.purchased and self.playing:
-                self.status = Status.PLAYING
-            elif self.purchased and not self.playing and self.played:
-                self.status = Status.PAUSED
-            elif self.purchased:
-                self.status = Status.PURCHASED
-            else:
-                self.status = Status.RELEASED
+            days_till_release = self._calculate_days_till_release()
+            if not self.released:
+                if self.purchased:
+                    self.status = Status.PREORDERED
+                elif days_till_release > 180:
+                    self.status = Status.COMING
+                elif days_till_release <= 180:
+                    self.status = Status.COMING_SOON
+                return
+            
+            if self.released:
+                if self.purchased and self.playing:
+                    self.status = Status.PLAYING
+                elif self.purchased and not self.playing and self.played:
+                    self.status = Status.PAUSED
+                elif self.purchased:
+                    self.status = Status.PURCHASED
+                else:
+                    self.status = Status.RELEASED
+        except Exception as e:
+            print(f'Error occurred while updating Game status : {e}')
+    
 
 
     def set_purchase(self) -> None:
         """Sets the purchase date and purchase related status."""
         # TODO this can be called when the game is purchased before or after released.
         while True:
-            purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\nPlease enter 0, if you haven\'t purchased the game yet.')
+            purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\nPlease enter 0, if you haven\'t purchased the game yet.\n')
             if purchase_date == 0:
                 self.purchased = False
                 break
@@ -180,6 +183,7 @@ class Game:
         self.developers = wikidata.get('developers')
         self.publishers = wikidata.get('publishers')
         self.release_date = datetime.strptime(wikidata.get('release_date')[:10], '%Y-%m-%d') #TODO error handling is required
+        self.released = self._is_released()
         self.platforms = wikidata.get('platforms') # TODO allow to select the platform
         #self.logo = wikidata.get('logo') # TODO handle the logo image
 
@@ -187,7 +191,7 @@ class Game:
     def _is_released(self) -> bool:
         """Verifies whether a game has been released."""
         # TODO this should be called each time the game is requested
-        current_date = datetime.today().strftime('%Y-%m-%d')
+        current_date = datetime.today()
         if not self.release_date:
             self.released = False
         elif self.release_date:
@@ -203,8 +207,8 @@ class Game:
         if not self.release_date:
             raise RuntimeError('Even no release date has been announced.')
         else:
-            current_date = datetime.today().strftime('%Y-%m-%d')
-            return abs(self.release_date - current_date).days
+            current_date = datetime.today()
+            return (self.release_date - current_date).days
         
 
     def fill_post_playing_data(self):

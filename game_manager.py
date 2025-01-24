@@ -1,7 +1,7 @@
 """Manage games by registering, and updating them."""
 from async_sparql_wrapper import AsyncSparqlWrapper
+from db_manager import query_db_with_pool
 from game import Game
-import re
 from SPARQLWrapper import JSON
 from tabulate import tabulate # temp mesure for user interaction
 from typing import Any, Dict, List
@@ -12,34 +12,47 @@ URL_OPENCRITIC = 'https://opencritic.com/game/'
 WIKIDATA_SPARQL_URL = "https://query.wikidata.org/sparql"
 date_pattern = r'^\d{4}-\d{2}-\d{2}$'
 
-async def create_target_game_entry(search_title: str, search_page_num: int = 10, search_offset: int = 0) -> Game:
+async def resolve_game_entry(search_title: str, db_connection_pool, search_page_num: int = 10, search_offset: int = 0) -> Game:
+    """Creates an instance of `Game` class when it's found in game_db or Wikidata.
+    
+    Args:
+        search_title: the user's input for the game title to search for.
+        db_connection_pool: the pool of Connection to use to connect to DB. This will only used by the methods requiring `game_db`.
+        search_page_num: the number of pages to look into at once when searching Wikidata.
+        search_offset: the number of pages to ignore to retrieve the next batch of pages when searching Wikidata.
+    """
     game_of_interest: Game = None
     game_candidates: List[Dict[str, str]] = []
     selected_candidate: Dict[str, str] = None
 
     try:
+        if not search_title:
+            search_title = input('Put the title of the game.\n').lower() # TODO a place holder for the client request.
+        # TODO GTPS-62 Try to get game data from game_db
+        # response = await _search_game_in_gameDB(search_title) # offset feature, is it necessary?
+        # game_candiates = _make_cadidate_list(response) # TODO GTPS-62 making a list of game candidates out of the games found from game DB
+
         candidate_loop_count = 0
         candidate_loop_limit = 3
-
-        while candidate_loop_count < candidate_loop_limit:
-            if not search_title:
-                search_title = input('Put the title of the game.\n').lower()
-
+        while not game_candidates and (candidate_loop_count < candidate_loop_limit):
+            # TODO When the game doesn't exist in game_db 
             # Try to get metadata of the game in `Wikidata
-            response = await _search_games_in_wikidata(search_title, search_page_num, search_offset)  # Be careful with search_offset.
+            response = await _search_wikidata(search_title, search_page_num, search_offset)  # Be careful with search_offset.
             game_candidates = _make_cadidate_list(response)
+            candidate_loop_count += 1
             print(f'For debugging, game_candidates : {game_candidates}')  # For debugging
 
             if not game_candidates:
                 search_title = input(f'Nothing has been found with {search_title}. Please try agin or with another title.\n')
-                candidate_loop_count += 1
                 continue
             break
         
         if game_candidates:
             selected_candidate = await _display_game_candidates(game_candidates, search_title, search_page_num, search_offset)
-
-        game_of_interest = _create_game_entry(selected_candidate)
+            if candidate_loop_count != 0:
+                await _add_new_game_to_db(selected_candidate, db_connection_pool) # TODO GTPS-59 this case, the game was not found in the game DB but in Wikidata. It should be added to the DB.
+                
+        game_of_interest = _fill_game_entry(selected_candidate)
         return game_of_interest
 
     # Error catching for SPARQL query
@@ -47,7 +60,7 @@ async def create_target_game_entry(search_title: str, search_page_num: int = 10,
         print(f'Error occurred : {e}')
 
 
-async def _search_games_in_wikidata(search_title: str, search_page_num: int = 10, search_offset: int = 0) -> Any:
+async def _search_wikidata(search_title: str, search_page_num: int = 10, search_offset: int = 0) -> Any:
     '''Sends SPARQL query to `Metadata` for a game and returns the response.
     
     Args:
@@ -127,7 +140,7 @@ async def _search_games_in_wikidata(search_title: str, search_page_num: int = 10
 
 
 def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
-    ''' Makes a list of metadata of found games as candidates for the user to choose as a target game.
+    ''' Makes a list of found games as candidates for the user to choose as a target game.
 
     Args:
         sparql_response : The response of SPARQL query containing probably multiple pages of games.
@@ -135,8 +148,11 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
     Returns:
         candidates : A list of dictionaries containing multiple games' metadata.
     '''
-    wikipedia_link = ''  # article
-    wikidata_link = ''  # item
+    # TODO GTPS-62 add logic to handle the case where the games are found in game_db.
+
+    #wikipedia_link = ''  # article
+    #wikidata_link = ''  # item
+    wikidata_code = '' # wikidata code
     genres = ''  # genres
     developers = ''  # developers
     publishers = ''  # publishers
@@ -152,8 +168,9 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
 
     for element in sparql_response['results']['bindings']:  # -> List of Dicts, `element` is a dict
         if all(key in element for key in target_keys):  # Lower the level of detail here
-            wikipedia_link = element['article']['value']
-            wikidata_link = element['item']['value']
+            #wikipedia_link = element['article']['value']
+            #wikidata_link = element['item']['value']
+            wikidata_code = element['item']['value'].rsplit('/', 1)[-1]
             genres = element['genres']['value']
             developers = element['developers']['value']
             publishers = element['publishers']['value']
@@ -162,8 +179,9 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
             title = element['titleLabel']['value']
 
             candiate = {
-                'wikipedia_link': wikipedia_link,
-                'wikidata_link': wikidata_link,
+                #'wikipedia_link': wikipedia_link,
+                #'wikidata_link': wikidata_link,
+                'wikidata_code': wikidata_code,
                 'genres': genres,
                 'developers': developers,
                 'publishers': publishers,
@@ -209,34 +227,35 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], search
             new_search_title = input('Put the title of the game.\n')
             if search_title == new_search_title:
               search_offset = search_offset + search_page_num # if the search is requested with the same title, the next page should be provided.
-            await create_target_game_entry(search_title, search_page_num, search_offset) # TODO this part might create an infinite loop.
+            await resolve_game_entry(search_title, search_page_num, search_offset) # TODO this part might create an infinite loop.
         elif 1 <= choice <= len(temp):
             print(f'You selected {temp[choice-1]["title"]} of {temp[choice-1]["release_date"]}')
             return game_candidates[choice-1]
 
 
-def _create_game_entry(selected_candidate: Dict[str, str]) -> Game:
+def _fill_game_entry(selected_candidate: Dict[str, str]) -> Game:
     """Creates an instance of `Game` class.
     
     Args:
       selected_candidated: A list of dictionaries of metadata retrieved from `Wikidata`.
-      use_wikidata: If false, the metadata of the game is left empty.
+      manually_created: If True, the metadata of the game is left empty.
 
     Returns:
       An instance of Game.
     """
     game_of_interest: Game = None
     title = ''
-    use_wikidata = False
+    manually_created = True
 
     if selected_candidate:
         title = selected_candidate.get('title')
-        use_wikidata = True
+        manually_created = False
     else:
-        print('The game cannot be found in `WikiData` for its metadata now.\nCreate the entry manually. Missing details can be filled up later.')
+        print('The game cannot be found in our database or `WikiData` now.\nCreate the entry manually. Missing details can be filled up later.') # TODO be more specific by asking more info?
         title = input('Please enter the game\'s full title.')
+        _add_new_game_to_db({'title': title}, manually_created) # TODO GTPS-59, in case this is a whole new game. 
 
-    game_of_interest = Game(title, use_wikidata, selected_candidate)
+    game_of_interest = Game(title, manually_created, selected_candidate)
     game_of_interest.set_purchase()
     game_of_interest.set_play_platform()
     game_of_interest.set_expectation()
@@ -244,3 +263,30 @@ def _create_game_entry(selected_candidate: Dict[str, str]) -> Game:
     game_of_interest.fill_open_score()
 
     return game_of_interest
+
+
+async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manually_created: bool = False):
+    """Adds a new game to the game DB by sending a query to `game_db`.
+    
+    Args:
+        new_game: a dictionary of a new game to be added into game_db.
+        db_connection_pool: the pool of Connection to use to connect to DB
+        manually_created: If True, this entry should be updated in the future.
+    """
+    print('-----------------------------')
+    print(new_game)
+    print('-----------------------------')
+    wikidata_code = new_game.get('wikidata_code', '')
+    generes = new_game.get('generes', '')
+    developers = new_game.get('developers', '')
+    publishers = new_game.get('publishers', '')
+    release_date = new_game.get('release_date', '')[:10]
+    platforms = new_game.get('platforms', '')
+    title = new_game.get('title', '')
+    query = f"""
+    USE game_db;
+    INSERT INTO game_table 
+    (wikidata_code, genres, developers, publishers, release_date, platforms, title, manually_created)
+    VALUES('{wikidata_code}', '{generes}', '{developers}', '{publishers}', '{release_date}', '{platforms}', '{title}', '{1 if manually_created else 0}');
+    """
+    await query_db_with_pool(db_connection_pool, query)
