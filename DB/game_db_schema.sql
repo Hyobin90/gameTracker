@@ -1,5 +1,3 @@
-CREATE DATABASE IF NOT EXISTS game_db;
-USE game_db;
 CREATE TABLE IF NOT EXISTS game_table (
 	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -17,4 +15,3 @@ CREATE TABLE IF NOT EXISTS game_table (
     open_user_score FLOAT UNSIGNED,
     my_score INT UNSIGNED
 );
-
