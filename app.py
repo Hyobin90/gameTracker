@@ -2,7 +2,7 @@
 import asyncio
 import argparse
 from db_manager import create_db, init_pool, local_db_host, local_db_passwd, local_db_port, local_db_user, game_db_schema_path
-from game_manager import resolve_game_entry
+from game_manager import resolve_game_entry, _add_new_game_to_db
 import os
 
 
@@ -12,7 +12,7 @@ async def main():
     # Initialize `game_db`
     await create_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
     db_connection_pool = await init_pool(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db')
-    await resolve_game_entry('god of war ragnarok', db_connection_pool)
+    await resolve_game_entry('doom the dark ages', db_connection_pool)
 
     # The last to step before closing the app
     db_connection_pool.close()

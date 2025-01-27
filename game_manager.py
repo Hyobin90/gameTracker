@@ -1,10 +1,12 @@
 """Manage games by registering, and updating them."""
 from async_sparql_wrapper import AsyncSparqlWrapper
-from db_manager import query_db_with_pool
+from datetime import datetime
+from db_manager import query_db_with_pool, IntegrityError
 from game import Game
 from SPARQLWrapper import JSON
 from tabulate import tabulate # temp mesure for user interaction
 from typing import Any, Dict, List
+import re
 
 
 URL_METACRITIC = 'https://www.metacritic.com/game/'
@@ -37,13 +39,14 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
         while not game_candidates and (candidate_loop_count < candidate_loop_limit):
             # TODO When the game doesn't exist in game_db 
             # Try to get metadata of the game in `Wikidata
+            search_offset += search_page_num * candidate_loop_count
             response = await _search_wikidata(search_title, search_page_num, search_offset)  # Be careful with search_offset.
             game_candidates = _make_cadidate_list(response)
             candidate_loop_count += 1
             print(f'For debugging, game_candidates : {game_candidates}')  # For debugging
 
             if not game_candidates:
-                search_title = input(f'Nothing has been found with {search_title}. Please try agin or with another title.\n')
+                #search_title = input(f'Nothing has been found with {search_title}. Please try agin or with another title.\n')
                 continue
             break
         
@@ -57,7 +60,7 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
 
     # Error catching for SPARQL query
     except Exception as e:
-        print(f'Error occurred : {e}')
+        print(f'Error occurred while resolving game entry : {e}')
 
 
 async def _search_wikidata(search_title: str, search_page_num: int = 10, search_offset: int = 0) -> Any:
@@ -73,7 +76,7 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
 
     '''
     query_game = f"""
-    SELECT DISTINCT ?item ?itemLabel ?article ?titleLabel ?publicationDateLabel
+    SELECT DISTINCT ?item ?itemLabel ?titleLabel ?publicationDateLabel
           (GROUP_CONCAT(DISTINCT ?platformLabel; separator=", ") AS ?platforms)
           (GROUP_CONCAT(DISTINCT ?genreLabel; separator=", ") AS ?genres)
           (GROUP_CONCAT(DISTINCT ?developerLabel; separator=", ") AS ?developers)
@@ -81,15 +84,21 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
     WHERE {{
         ?item wdt:P31 ?type.
         VALUES ?type {{ wd:Q7889 wd:Q64170203 }}.
-        ?item rdfs:label ?label.
-        FILTER(CONTAINS(LCASE(?label), "{search_title}")).
+        ?item rdfs:label ?titleLabel.
+        FILTER(LANG(?titleLabel) = "en").
+        ?item skos:altLabel ?alias.
+        FILTER(LANG(?alias) = "en").
+        FILTER(CONTAINS(LCASE(?titleLabel), LCASE("{search_title}")) || CONTAINS(LCASE(?alias), LCASE("{search_title}"))).
         OPTIONAL {{
-            ?article schema:about ?item;
-                     schema:inLanguage "en";
-                     schema:isPartOf <https://en.wikipedia.org/>.
+            ?item p:P1476 ?titleNode.
+            ?titleNode ps:P1476 ?titleLabel.
+            FILTER(LANG(?titleLabel) = "en").
         }}
         OPTIONAL {{
-            ?item wdt:P1476 ?titleLabel.
+            ?item p:P400 ?platformNode.
+            ?platformNode ps:P400 ?platformLabel.
+            FILTER(LANG(?platformLabel) = "en").
+            FILTER(CONTAINS(LCASE(?platformLabel), "playstation 4") || CONTAINS(LCASE(?platformLabel), "playstation 5")).
         }}
         OPTIONAL {{
             ?item p:P577 ?publicationDateNode.
@@ -120,7 +129,7 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
             FILTER(LANG(?publisherLabel) = "en").
         }}
     }}
-    GROUP BY ?item ?itemLabel ?article ?titleLabel ?publicationDateLabel
+    GROUP BY ?item ?itemLabel ?titleLabel ?publicationDateLabel
     LIMIT {search_page_num}
     OFFSET {search_offset}
     """
@@ -162,25 +171,22 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
 
     # target_keys = ['article', 'item', 'genres', 'developers', 'publishers', 
     #                'publicationDateLabel', 'platforms', 'titleLabel']
-    target_keys = ['article', 'item', 'titleLabel']
+    target_keys = ['item', 'titleLabel']
 
-    game_candiates: List[Dict[str, str]] = []
+    game_candiates: List[Dict[str, Any]] = []
 
     for element in sparql_response['results']['bindings']:  # -> List of Dicts, `element` is a dict
         if all(key in element for key in target_keys):  # Lower the level of detail here
-            #wikipedia_link = element['article']['value']
-            #wikidata_link = element['item']['value']
-            wikidata_code = element['item']['value'].rsplit('/', 1)[-1]
-            genres = element['genres']['value']
-            developers = element['developers']['value']
-            publishers = element['publishers']['value']
-            release_date = element['publicationDateLabel']['value']
-            platforms = element['platforms']['value']
-            title = element['titleLabel']['value']
-
+            temp_wikidata_code = element.get('item', {}).get('value', None)
+            wikidata_code = temp_wikidata_code.rsplit('/', 1)[-1] if temp_wikidata_code is not None else None
+            genres = element.get('genres', {}).get('value', None)
+            developers = element.get('developers', {}).get('value', None)
+            publishers = element.get('publishers', {}).get('value', None)
+            release_date = element.get('publicationDateLabel', {}).get('value', None)
+            platforms = element.get('platforms', {}).get('value', None) # TODO GTPS-64
+            title = element.get('titleLabel', {}).get('value', None)
+            
             candiate = {
-                #'wikipedia_link': wikipedia_link,
-                #'wikidata_link': wikidata_link,
                 'wikidata_code': wikidata_code,
                 'genres': genres,
                 'developers': developers,
@@ -189,7 +195,6 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
                 'platforms': platforms,
                 'title': title
             }
-
             game_candiates.append(candiate)
 
     return game_candiates
@@ -210,7 +215,8 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], search
     # Create a table to display
     temp = []
     for index, candidate in enumerate(game_candidates):
-        temp.append({'index': index + 1, 'title': candidate.get('title'), 'platforms': candidate.get('platforms'), 'release_date': candidate.get('release_date')[:10]})
+        temp.append({'index': index + 1, 'title': candidate.get('title'), 'platforms': candidate.get('platforms'),
+                     'release_date': candidate.get('release_date')[:10] if candidate.get('release_date') is not None else None})
 
     print('Choose the desired game from the list.')
     print(tabulate(temp, headers='keys', tablefmt='rounded_outline'))
@@ -218,7 +224,7 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], search
     while True:
         while True:
             try:
-                choice = int(input('Enter the number of the game that you want.\nIf the desired is not present in the list, press 0.\n'))
+                choice = int(input('Enter the number of the game that you want.\nIf you want to search for the same title one more time, press 0.\n'))
             except ValueError as e:
                 print('Please enter a valid number.\nIf the desired is not present in the list, press 0.\n')
                 continue
@@ -273,20 +279,25 @@ async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manu
         db_connection_pool: the pool of Connection to use to connect to DB
         manually_created: If True, this entry should be updated in the future.
     """
-    print('-----------------------------')
-    print(new_game)
-    print('-----------------------------')
-    wikidata_code = new_game.get('wikidata_code', '')
-    generes = new_game.get('generes', '')
-    developers = new_game.get('developers', '')
-    publishers = new_game.get('publishers', '')
-    release_date = new_game.get('release_date', '')[:10]
+    wikidata_code = new_game.get('wikidata_code', None)
+    genres = new_game.get('genres', None)
+    developers = new_game.get('developers', None)
+    publishers = new_game.get('publishers', None)
+    release_date = new_game.get('release_date', None)
+    if release_date is not None:
+        release_date = release_date[:10]
+    released = 1 if release_date and datetime.strptime(release_date, '%Y-%m-%d') <= datetime.today() else 0
     platforms = new_game.get('platforms', '')
     title = new_game.get('title', '')
     query = f"""
     USE game_db;
     INSERT INTO game_table 
-    (wikidata_code, genres, developers, publishers, release_date, platforms, title, manually_created)
-    VALUES('{wikidata_code}', '{generes}', '{developers}', '{publishers}', '{release_date}', '{platforms}', '{title}', '{1 if manually_created else 0}');
+    (wikidata_code, genres, developers, publishers, release_date, released, platforms, title, manually_created)
+    VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);
     """
-    await query_db_with_pool(db_connection_pool, query)
+    values = (wikidata_code, genres, developers, publishers, release_date, released, platforms, title, 1 if manually_created else 0)
+    try:
+        await query_db_with_pool(db_connection_pool, query, values, 'INSERT')
+    except Exception as e:
+        # TODO Leave this for catching errors that might happen in the future 
+        print(f'Error occurred while adding a new game into gameDB | {e}')

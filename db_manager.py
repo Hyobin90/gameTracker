@@ -1,7 +1,7 @@
-from aiomysql import connect, create_pool, OperationalError, ProgrammingError
+from aiomysql import connect, create_pool, DictCursor, OperationalError, ProgrammingError, IntegrityError
 from dotenv import load_dotenv
 import os
-from typing import Any, Optional
+from typing import Any, Tuple, Optional
 
 
 # load the credential for the DB
@@ -28,7 +28,7 @@ async def create_db(host: str, port: int, user: str, passwd: str, db_name: str, 
             print(f'{db_name} has been created successfully.')
 
     except OperationalError as e:
-        print(f'Error occurred : {e}')
+        print(f'Error occurred while creating DB: {e}')
         print(f'Creating a new DB, {db_name}')
         db_connection = await connect(host=host, user=user, password=passwd, port=port)
         async with db_connection.cursor() as db_cursor:
@@ -36,7 +36,7 @@ async def create_db(host: str, port: int, user: str, passwd: str, db_name: str, 
             await db_cursor.execute(f'USE {db_name}')
             await create_db(local_db_host, local_db_port, local_db_user, local_db_passwd, 'game_db', game_db_schema_path)
     except ProgrammingError as e:
-        print(f'Error occurred : {e}')
+        print(f'Error occurred while creating DB: {e}')
 
 
 async def init_pool(host: str, port: int, user: str, passwd: str, db_name: str):
@@ -45,13 +45,21 @@ async def init_pool(host: str, port: int, user: str, passwd: str, db_name: str):
     return pool
 
 
-async def query_db_with_pool(pool, query) -> Optional[Any]:
+async def query_db_with_pool(pool, query: str, values: Optional[Tuple], query_type: str) -> Optional[Any]:
     """Sends a query to DB using Connection pool."""
     try:
         async with pool.acquire() as db_connection:
-            async with db_connection.cursor() as db_cursor:
-                await db_cursor.execute(query)
-                result = db_cursor.fetchall()
-                return result
+            async with db_connection.cursor(DictCursor) as db_cursor:
+                if values:
+                    await db_cursor.execute(query, values)
+                else:
+                    await db_cursor.execute(query)
+                if query_type == 'SELECT':
+                    result = await db_cursor.fetchall()
+                    return result
+                elif query_type in ('INSERT', 'UPDATE'):
+                    await db_connection.commit()
+    except IntegrityError as e:
+        raise IntegrityError() from e
     except Exception as e:
-        print(f'Error occurred while querying : {e}')
+        print(f'Error occurred while querying : {type(e)} | {e}')

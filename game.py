@@ -55,6 +55,7 @@ class Game:
         self.developers = ''
         self.publishers = ''
         self.release_date = None
+        self.released = None
         self.platforms = ''
         self.my_score = 0
 
@@ -119,7 +120,7 @@ class Game:
         # TODO this can be called when the game is purchased before or after released.
         while True:
             purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\nPlease enter 0, if you haven\'t purchased the game yet.\n')
-            if purchase_date == 0:
+            if purchase_date == '0':
                 self.purchased = False
                 break
             elif _validate_date_format(purchase_date):
@@ -177,14 +178,18 @@ class Game:
 
     def fill_metadata_from_wikidata(self, wikidata:Dict[str, str]):
         """Fills up the metadata from `Wikidata` """
-        self.wikipedia_link = wikidata.get('wikipedia_link')
-        self.wikidata_link = wikidata.get('wikidata_link')
-        self.genres = wikidata.get('genres')
-        self.developers = wikidata.get('developers')
-        self.publishers = wikidata.get('publishers')
-        self.release_date = datetime.strptime(wikidata.get('release_date')[:10], '%Y-%m-%d') #TODO error handling is required
-        self.released = self._is_released()
-        self.platforms = wikidata.get('platforms') # TODO allow to select the platform
+        try:
+            self.wikipedia_link = wikidata.get('wikipedia_link')
+            self.wikidata_link = wikidata.get('wikidata_link')
+            self.genres = wikidata.get('genres')
+            self.developers = wikidata.get('developers')
+            self.publishers = wikidata.get('publishers')
+            self.release_date = datetime.strptime(wikidata.get('release_date')[:10], '%Y-%m-%d') if isinstance(wikidata.get('release_date'), str) else None
+            self.released = self._is_released()
+            self.platforms = wikidata.get('platforms') # TODO allow to select the platform
+        except Exception as e:
+            print(f'Error occurred while filling metadata | {e}')
+            # TODO specify error types case by case
         #self.logo = wikidata.get('logo') # TODO handle the logo image
 
 
@@ -192,14 +197,17 @@ class Game:
         """Verifies whether a game has been released."""
         # TODO this should be called each time the game is requested
         current_date = datetime.today()
+        released = None
+        # In case the release date hasn't been announced yet.
         if not self.release_date:
-            self.released = False
+            released = False
         elif self.release_date:
             if self.release_date <= current_date:
-                self.released = True
+                released = True
             else:
-                self.released = False
+                released = False
         self.update_status()
+        return released
 
 
     def _calculate_days_till_release(self) -> int:
