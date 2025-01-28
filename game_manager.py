@@ -95,24 +95,26 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
             FILTER(LANG(?titleLabel) = "en").
         }}
         OPTIONAL {{
-            ?item p:P400 ?platformNode.
-            ?platformNode ps:P400 ?platformLabel.
-            FILTER(LANG(?platformLabel) = "en").
-            FILTER(CONTAINS(LCASE(?platformLabel), "playstation 4") || CONTAINS(LCASE(?platformLabel), "playstation 5")).
-        }}
-        OPTIONAL {{
             ?item p:P577 ?publicationDateNode.
             FILTER NOT EXISTS {{
                 ?publicationDateNode pq:P2241 ?deprecationReason
             }}
             ?publicationDateNode ps:P577 ?publicationDateLabel.
             OPTIONAL {{
-                ?publicationDateNode pq:P400 ?platformNode.
-                ?platformNode rdfs:label ?platformLabel.
-                FILTER(LANG(?platformLabel) = "en").
-                FILTER(CONTAINS(LCASE(?platformLabel), "playstation 4") || CONTAINS(LCASE(?platformLabel), "playstation 5")).
+                ?publicationDateNode pq:P400 ?platformNodeFromDate.
+                ?platformNodeFromDate rdfs:label ?platformLabelFromDate.
+                FILTER(LANG(?platformLabelFromDate) = "en").
+                FILTER(CONTAINS(LCASE(?platformLabelFromDate), "playstation 4") || CONTAINS(LCASE(?platformLabelFromDate), "playstation 5")).
             }}
         }}
+        OPTIONAL {{
+            ?item p:P400 ?platformNode.
+            ?platformNode ps:P400 ?platformCode.
+            ?platformCode rdfs:label ?platformLabel.
+            FILTER(LANG(?platformLabel) = "en").
+            FILTER(CONTAINS(LCASE(?platformLabel), "playstation 4") || CONTAINS(LCASE(?platformLabel), "playstation 5")).
+        }}
+        BIND(COALESCE(?platformLabelFromDate, ?plaformLabel) AS ?finalPlatformLabel)
         OPTIONAL {{
             ?item wdt:P136 ?genre.
             ?genre rdfs:label ?genreLabel.
@@ -298,6 +300,8 @@ async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manu
     values = (wikidata_code, genres, developers, publishers, release_date, released, platforms, title, 1 if manually_created else 0)
     try:
         await query_db_with_pool(db_connection_pool, query, values, 'INSERT')
+    except IntegrityError as e:
+        raise IntegrityError(f'IntegrityError has occurred. {title} is already present in the DB. Please check. | {e.__cause__}') from e
     except Exception as e:
         # TODO Leave this for catching errors that might happen in the future 
-        print(f'Error occurred while adding a new game into gameDB | {e}')
+        print(f'Error occurred while adding a new game into gameDB | {e.__cause__}')
