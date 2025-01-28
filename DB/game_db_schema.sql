@@ -13,5 +13,6 @@ CREATE TABLE IF NOT EXISTS game_table (
     meta_user_score FLOAT UNSIGNED,
 	open_critic_score INT UNSIGNED,
     open_user_score FLOAT UNSIGNED,
-    my_score INT UNSIGNED
+    my_score INT UNSIGNED,
+    manually_created BOOLEAN
 );
