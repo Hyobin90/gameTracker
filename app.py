@@ -6,8 +6,6 @@ from game_manager import resolve_game_entry, _add_new_game_to_db
 import os
 
 
-
-
 async def main():
     # Initialize `game_db`
     await create_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
