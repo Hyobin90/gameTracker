@@ -81,7 +81,7 @@ class Game:
         self.status: Status = None
 
         if not manually_created:
-            self.fill_metadata_from_wikidata(wikidata) #TODO GTPS-59 prioritize the gameDB
+            self._fill_metadata_from_wikidata(wikidata) #TODO GTPS-59 prioritize the gameDB
 
 
     def update_status(self) -> None:
@@ -176,7 +176,7 @@ class Game:
             self.update_status()
 
 
-    def fill_metadata_from_wikidata(self, wikidata:Dict[str, str]):
+    def _fill_metadata_from_wikidata(self, wikidata:Dict[str, str]):
         """Fills up the metadata from `Wikidata` """
         try:
             self.wikipedia_link = wikidata.get('wikipedia_link')
