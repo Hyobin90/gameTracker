@@ -5,7 +5,7 @@ from db_manager import query_db_with_pool, IntegrityError
 from game import Game
 from SPARQLWrapper import JSON
 from tabulate import tabulate # temp mesure for user interaction
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import re
 import pprint
 
@@ -42,7 +42,7 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
             # Try to get metadata of the game in `Wikidata
             search_offset += search_page_num * candidate_loop_count
             response = await _search_wikidata(search_title, search_page_num, search_offset)  # Be careful with search_offset.
-            pprint.pprint(response)
+            #pprint.pprint(response) # For debugging
             game_candidates = _make_cadidate_list(response)
             candidate_loop_count += 1
             print(f'For debugging, game_candidates : {game_candidates}')  # For debugging
@@ -135,7 +135,6 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
             ?publisher rdfs:label ?publisherLabel.
             FILTER(LANG(?publisherLabel) = "en").
         }}
-        FILTER(STR(?placeName) = "worldwide" || LCASE(STR(?placeName)) = "north america")
     }}
     GROUP BY ?item ?itemLabel ?titleLabel ?publicationDateLabel ?placeName
     LIMIT {search_page_num}
@@ -166,19 +165,15 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
         candidates : A list of dictionaries containing multiple games' metadata.
     '''
     # TODO GTPS-62 add logic to handle the case where the games are found in game_db.
-
-    #wikipedia_link = ''  # article
-    #wikidata_link = ''  # item
     wikidata_code = '' # wikidata code
     genres = ''  # genres
     developers = ''  # developers
     publishers = ''  # publishers
     release_date = ''  # publicationDates
     platforms = ''  # platforms
+    publication_region = '' #placeName
     title = ''  # titleLabel
 
-    # target_keys = ['article', 'item', 'genres', 'developers', 'publishers', 
-    #                'publicationDateLabel', 'platforms', 'titleLabel']
     target_keys = ['item', 'titleLabel']
 
     game_candiates: List[Dict[str, Any]] = []
@@ -191,7 +186,8 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
             developers = element.get('developers', {}).get('value', None)
             publishers = element.get('publishers', {}).get('value', None)
             release_date = element.get('publicationDateLabel', {}).get('value', None)
-            platforms = element.get('platforms', {}).get('value', None) # TODO GTPS-64
+            platforms = element.get('platforms', {}).get('value', None)
+            publication_region = element.get('placeName', {}).get('value', None)
             title = element.get('titleLabel', {}).get('value', None)
             
             candiate = {
@@ -199,11 +195,13 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
                 'genres': genres,
                 'developers': developers,
                 'publishers': publishers,
-                'release_date': release_date,
+                'release_date': _process_release_date(release_date, publication_region),
                 'platforms': platforms,
+                'publication_region': publication_region,
                 'title': title
             }
-            game_candiates.append(candiate)
+            if 'PlayStation' in candiate['platforms']: # filtering for PlayStation
+                game_candiates.append(candiate)
 
     return game_candiates
 
@@ -223,9 +221,9 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], search
     # Create a table to display
     temp = []
     for index, candidate in enumerate(game_candidates):
-        temp.append({'index': index + 1, 'title': candidate.get('title'), 'platforms': candidate.get('platforms'),
-                     'release_date': candidate.get('release_date')[:10] if candidate.get('release_date') is not None else None})
-
+        temp.append({'index': index + 1, 'title': candidate.get('title'),
+                    'platforms': candidate.get('platforms'), 'publication_region': candidate.get('publication_region'),
+                    'release_date': candidate.get('release_date')[:10] if candidate.get('release_date') is not None else None})
     print('Choose the desired game from the list.')
     print(tabulate(temp, headers='keys', tablefmt='rounded_outline'))
 
@@ -311,3 +309,25 @@ async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manu
     except Exception as e:
         # TODO Leave this for catching errors that might happen in the future 
         print(f'Error occurred while adding a new game into gameDB | {e.__cause__}')
+
+
+def _process_release_date(release_date: Optional[str], publication_region: Optional[str]) -> str:
+    """Hanldes release dates when it's yyyy-01-01 by modifying it to yyyy-12-31 to indicate the title comes out somewhere in the year.
+    
+    Args:
+        release_date: the release date to process.
+        publication_region: the publication region of the game.
+    Returns:
+        a processed release date.
+    """
+    if release_date is None and publication_region is None:
+        return None
+    
+    release_date = release_date[:10]
+    date_elements = release_date.split('-', 2)
+    year = date_elements[0]
+    month = date_elements[1]
+    day = date_elements[2]
+
+    if month == '01' and day == '01':
+        return f'{year}-12-31'
