@@ -7,6 +7,7 @@ from SPARQLWrapper import JSON
 from tabulate import tabulate # temp mesure for user interaction
 from typing import Any, Dict, List
 import re
+import pprint
 
 
 URL_METACRITIC = 'https://www.metacritic.com/game/'
@@ -41,6 +42,7 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
             # Try to get metadata of the game in `Wikidata
             search_offset += search_page_num * candidate_loop_count
             response = await _search_wikidata(search_title, search_page_num, search_offset)  # Be careful with search_offset.
+            pprint.pprint(response)
             game_candidates = _make_cadidate_list(response)
             candidate_loop_count += 1
             print(f'For debugging, game_candidates : {game_candidates}')  # For debugging
@@ -76,8 +78,8 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
 
     '''
     query_game = f"""
-    SELECT DISTINCT ?item ?itemLabel ?titleLabel ?publicationDateLabel
-          (GROUP_CONCAT(DISTINCT ?platformLabel; separator=", ") AS ?platforms)
+    SELECT DISTINCT ?item ?itemLabel ?titleLabel ?publicationDateLabel ?placeName
+          (GROUP_CONCAT(DISTINCT ?finalPlatformLabel; separator=", ") AS ?platforms)
           (GROUP_CONCAT(DISTINCT ?genreLabel; separator=", ") AS ?genres)
           (GROUP_CONCAT(DISTINCT ?developerLabel; separator=", ") AS ?developers)
           (GROUP_CONCAT(DISTINCT ?publisherLabel; separator=", ") AS ?publishers)
@@ -104,7 +106,11 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
                 ?publicationDateNode pq:P400 ?platformNodeFromDate.
                 ?platformNodeFromDate rdfs:label ?platformLabelFromDate.
                 FILTER(LANG(?platformLabelFromDate) = "en").
-                FILTER(CONTAINS(LCASE(?platformLabelFromDate), "playstation 4") || CONTAINS(LCASE(?platformLabelFromDate), "playstation 5")).
+            }}
+            OPTIONAL {{
+                ?publicationDateNode pq:P291 ?placeOfDistribution.
+                ?placeOfDistribution rdfs:label ?placeName.
+                FILTER(LANG(?placeName) = "en")
             }}
         }}
         OPTIONAL {{
@@ -112,9 +118,8 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
             ?platformNode ps:P400 ?platformCode.
             ?platformCode rdfs:label ?platformLabel.
             FILTER(LANG(?platformLabel) = "en").
-            FILTER(CONTAINS(LCASE(?platformLabel), "playstation 4") || CONTAINS(LCASE(?platformLabel), "playstation 5")).
         }}
-        BIND(COALESCE(?platformLabelFromDate, ?plaformLabel) AS ?finalPlatformLabel)
+        BIND(COALESCE(?platformLabelFromDate, ?platformLabel) AS ?finalPlatformLabel).
         OPTIONAL {{
             ?item wdt:P136 ?genre.
             ?genre rdfs:label ?genreLabel.
@@ -130,8 +135,9 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
             ?publisher rdfs:label ?publisherLabel.
             FILTER(LANG(?publisherLabel) = "en").
         }}
+        FILTER(STR(?placeName) = "worldwide" || LCASE(STR(?placeName)) = "north america")
     }}
-    GROUP BY ?item ?itemLabel ?titleLabel ?publicationDateLabel
+    GROUP BY ?item ?itemLabel ?titleLabel ?publicationDateLabel ?placeName
     LIMIT {search_page_num}
     OFFSET {search_offset}
     """
