@@ -42,7 +42,7 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
             # Try to get metadata of the game in `Wikidata
             search_offset += search_page_num * candidate_loop_count
             response = await _search_wikidata(search_title, search_page_num, search_offset)  # Be careful with search_offset.
-            #pprint.pprint(response) # For debugging
+            pprint.pprint(response) # For debugging
             game_candidates = _make_cadidate_list(response)
             candidate_loop_count += 1
             print(f'For debugging, game_candidates : {game_candidates}')  # For debugging
@@ -78,14 +78,15 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
 
     '''
     query_game = f"""
-    SELECT DISTINCT ?item ?itemLabel ?titleLabel ?publicationDateLabel ?placeName
+    SELECT DISTINCT ?item ?itemLabel ?titleLabel ?publicationDateLabel ?placeName ?is_DLC
           (GROUP_CONCAT(DISTINCT ?finalPlatformLabel; separator=", ") AS ?platforms)
           (GROUP_CONCAT(DISTINCT ?genreLabel; separator=", ") AS ?genres)
           (GROUP_CONCAT(DISTINCT ?developerLabel; separator=", ") AS ?developers)
           (GROUP_CONCAT(DISTINCT ?publisherLabel; separator=", ") AS ?publishers)
     WHERE {{
         ?item wdt:P31 ?type.
-        VALUES ?type {{ wd:Q7889 wd:Q64170203 }}.
+        VALUES ?type {{ wd:Q7889 wd:Q64170203 wd:Q1066707}}.
+        BIND(IF(?type = wd:Q1066707, 1, 0) AS ?is_DLC).
         ?item rdfs:label ?titleLabel.
         FILTER(LANG(?titleLabel) = "en").
         ?item skos:altLabel ?alias.
@@ -136,7 +137,7 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
             FILTER(LANG(?publisherLabel) = "en").
         }}
     }}
-    GROUP BY ?item ?itemLabel ?titleLabel ?publicationDateLabel ?placeName
+    GROUP BY ?item ?itemLabel ?titleLabel ?publicationDateLabel ?placeName ?is_DLC
     LIMIT {search_page_num}
     OFFSET {search_offset}
     """
@@ -189,6 +190,7 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
             platforms = element.get('platforms', {}).get('value', None)
             publication_region = element.get('placeName', {}).get('value', None)
             title = element.get('titleLabel', {}).get('value', None)
+            is_DLC = True if element.get('is_DLC', {}).get('value', None) == '1' else False
             
             candiate = {
                 'wikidata_code': wikidata_code,
@@ -198,9 +200,10 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
                 'release_date': _process_release_date(release_date, publication_region),
                 'platforms': platforms,
                 'publication_region': publication_region,
+                'is_DLC': is_DLC,
                 'title': title
             }
-            if 'PlayStation' in candiate['platforms']: # filtering for PlayStation
+            if 'PlayStation' in candiate['platforms'] or candiate['is_DLC']: # filtering for PlayStation
                 game_candiates.append(candiate)
 
     return game_candiates
@@ -221,9 +224,10 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], search
     # Create a table to display
     temp = []
     for index, candidate in enumerate(game_candidates):
-        temp.append({'index': index + 1, 'title': candidate.get('title'),
-                    'platforms': candidate.get('platforms'), 'publication_region': candidate.get('publication_region'),
-                    'release_date': candidate.get('release_date')[:10] if candidate.get('release_date') is not None else None})
+        temp.append({'index': index + 1, 'title': candidate.get('title'), 'platforms': candidate.get('platforms'), 
+                     'publication_region': candidate.get('publication_region'), 
+                     'is_DLC': 'True' if candidate.get('is_DLC')  else 'False',
+                     'release_date': candidate.get('release_date')[:10] if candidate.get('release_date') is not None else None})
     print('Choose the desired game from the list.')
     print(tabulate(temp, headers='keys', tablefmt='rounded_outline'))
 
@@ -265,7 +269,10 @@ def _fill_game_entry(selected_candidate: Dict[str, str]) -> Game:
     else:
         print('The game cannot be found in our database or `WikiData` now.\nCreate the entry manually. Missing details can be filled up later.') # TODO be more specific by asking more info?
         title = input('Please enter the game\'s full title.')
-        _add_new_game_to_db({'title': title}, manually_created) # TODO GTPS-59, in case this is a whole new game. 
+        is_DLC = input('Is this a DLC? If so, press 0')
+        if is_DLC:
+            parent_title = input('Please enter the parent title')
+        _add_new_game_to_db({'title': title}, manually_created, is_DLC, parent_title)
 
     game_of_interest = Game(title, manually_created, selected_candidate)
     game_of_interest.set_purchase()
@@ -295,13 +302,14 @@ async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manu
     released = 1 if release_date and datetime.strptime(release_date, '%Y-%m-%d') <= datetime.today() else 0
     platforms = new_game.get('platforms', '')
     title = new_game.get('title', '')
+    is_DLC = new_game.get('is_DLC', 0)
     query = f"""
     USE game_db;
     INSERT INTO game_table 
-    (wikidata_code, genres, developers, publishers, release_date, released, platforms, title, manually_created)
-    VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);
+    (wikidata_code, genres, developers, publishers, release_date, released, platforms, title, is_DLC, manually_created)
+    VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
     """
-    values = (wikidata_code, genres, developers, publishers, release_date, released, platforms, title, 1 if manually_created else 0)
+    values = (wikidata_code, genres, developers, publishers, release_date, released, platforms, title, 1 if is_DLC else 0, 1 if manually_created else 0)
     try:
         await query_db_with_pool(db_connection_pool, query, values, 'INSERT')
     except IntegrityError as e:
@@ -323,11 +331,13 @@ def _process_release_date(release_date: Optional[str], publication_region: Optio
     if release_date is None and publication_region is None:
         return None
     
-    release_date = release_date[:10]
-    date_elements = release_date.split('-', 2)
+    cut_release_date = release_date[:10]
+    date_elements = cut_release_date.split('-', 2)
     year = date_elements[0]
     month = date_elements[1]
     day = date_elements[2]
 
-    if month == '01' and day == '01':
+    if not(month == '01' and day == '01'):
+        return release_date
+    else:
         return f'{year}-12-31'

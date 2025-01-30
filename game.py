@@ -58,6 +58,7 @@ class Game:
         self.released = None
         self.platforms = ''
         self.my_score = 0
+        self.is_dlc = None
 
         # Data to be filled after playing # TODO maybe with NoSQL implemented
         self.goals = {}
@@ -179,14 +180,14 @@ class Game:
     def _fill_metadata_from_wikidata(self, wikidata:Dict[str, str]):
         """Fills up the metadata from `Wikidata` """
         try:
-            self.wikipedia_link = wikidata.get('wikipedia_link')
-            self.wikidata_link = wikidata.get('wikidata_link')
+            self.wikidata_code = wikidata.get('wikidata_code')
             self.genres = wikidata.get('genres')
             self.developers = wikidata.get('developers')
             self.publishers = wikidata.get('publishers')
+            self.platforms = wikidata.get('platforms') # TODO allow to select the platform
             self.release_date = datetime.strptime(wikidata.get('release_date')[:10], '%Y-%m-%d') if isinstance(wikidata.get('release_date'), str) else None
             self.released = self._is_released()
-            self.platforms = wikidata.get('platforms') # TODO allow to select the platform
+            self.is_dlc = wikidata.get('is_DLC')
         except Exception as e:
             print(f'Error occurred while filling metadata | {e}')
             # TODO specify error types case by case
