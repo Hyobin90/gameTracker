@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS game_table (
 	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
+    alias VARCHAR(1024),
 	wikidata_code VARCHAR(100) UNIQUE,
     genres VARCHAR(1024),
     developers VARCHAR(255),

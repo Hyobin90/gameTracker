@@ -79,6 +79,7 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
     '''
     query_game = f"""
     SELECT DISTINCT ?item ?itemLabel ?titleLabel ?publicationDateLabel ?placeName
+          (GROUP_CONCAT(DISTINCT ?alias; separator=", ") AS ?aliases)
           (GROUP_CONCAT(DISTINCT ?finalPlatformLabel; separator=", ") AS ?platforms)
           (GROUP_CONCAT(DISTINCT ?genreLabel; separator=", ") AS ?genres)
           (GROUP_CONCAT(DISTINCT ?developerLabel; separator=", ") AS ?developers)
@@ -86,11 +87,19 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
     WHERE {{
         ?item wdt:P31 ?type.
         VALUES ?type {{ wd:Q7889 wd:Q64170203 }}.
+        
         ?item rdfs:label ?titleLabel.
         FILTER(LANG(?titleLabel) = "en").
-        ?item skos:altLabel ?alias.
-        FILTER(LANG(?alias) = "en").
-        FILTER(CONTAINS(LCASE(?titleLabel), LCASE("{search_title}")) || CONTAINS(LCASE(?alias), LCASE("{search_title}"))).
+        OPTIONAL {{
+            ?item skos:altLabel ?search_alias.
+            FILTER(LANG(?search_alias) = "en").
+        }}
+        FILTER(CONTAINS(LCASE(?titleLabel), LCASE("{search_title}")) || CONTAINS(LCASE(?search_alias), LCASE("{search_title}"))).
+
+        OPTIONAL {{
+            ?item skos:altLabel ?alias.
+            FILTER(LANG(?search_alias) = "en")
+        }}
         OPTIONAL {{
             ?item p:P1476 ?titleNode.
             ?titleNode ps:P1476 ?titleLabel.
@@ -119,7 +128,9 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
             ?platformCode rdfs:label ?platformLabel.
             FILTER(LANG(?platformLabel) = "en").
         }}
+
         BIND(COALESCE(?platformLabelFromDate, ?platformLabel) AS ?finalPlatformLabel).
+
         OPTIONAL {{
             ?item wdt:P136 ?genre.
             ?genre rdfs:label ?genreLabel.
