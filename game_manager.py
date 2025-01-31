@@ -78,78 +78,29 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
 
     '''
     query_game = f"""
-    SELECT DISTINCT ?item ?itemLabel ?titleLabel ?publicationDateLabel ?placeName
-          (GROUP_CONCAT(DISTINCT ?alias; separator=", ") AS ?aliases)
-          (GROUP_CONCAT(DISTINCT ?finalPlatformLabel; separator=", ") AS ?platforms)
-          (GROUP_CONCAT(DISTINCT ?genreLabel; separator=", ") AS ?genres)
-          (GROUP_CONCAT(DISTINCT ?developerLabel; separator=", ") AS ?developers)
-          (GROUP_CONCAT(DISTINCT ?publisherLabel; separator=", ") AS ?publishers)
+    SELECT DISTINCT ?item ?titleLabel (GROUP_CONCAT(DISTINCT ?platformLabel; separator=", ") AS ?platforms)
     WHERE {{
         ?item wdt:P31 ?type.
-        VALUES ?type {{ wd:Q7889 wd:Q64170203 }}.
+        VALUES ?type {{wd:Q7889 wd:Q64170203}}.
         
         ?item rdfs:label ?titleLabel.
-        FILTER(LANG(?titleLabel) = "en").
-        OPTIONAL {{
-            ?item skos:altLabel ?search_alias.
-            FILTER(LANG(?search_alias) = "en").
+        FILTER(LANG(?titleLabel)="en").
+    
+        OPTIONAL{{
+            ?item skos:altLabel ?search_alias. 
+            FILTER(LANG(?search_alias)="en").
         }}
+    
         FILTER(CONTAINS(LCASE(?titleLabel), LCASE("{search_title}")) || CONTAINS(LCASE(?search_alias), LCASE("{search_title}"))).
-
-        OPTIONAL {{
-            ?item skos:altLabel ?alias.
-            FILTER(LANG(?search_alias) = "en")
-        }}
-        OPTIONAL {{
-            ?item p:P1476 ?titleNode.
-            ?titleNode ps:P1476 ?titleLabel.
-            FILTER(LANG(?titleLabel) = "en").
-        }}
-        OPTIONAL {{
-            ?item p:P577 ?publicationDateNode.
-            FILTER NOT EXISTS {{
-                ?publicationDateNode pq:P2241 ?deprecationReason
-            }}
-            ?publicationDateNode ps:P577 ?publicationDateLabel.
-            OPTIONAL {{
-                ?publicationDateNode pq:P400 ?platformNodeFromDate.
-                ?platformNodeFromDate rdfs:label ?platformLabelFromDate.
-                FILTER(LANG(?platformLabelFromDate) = "en").
-            }}
-            OPTIONAL {{
-                ?publicationDateNode pq:P291 ?placeOfDistribution.
-                ?placeOfDistribution rdfs:label ?placeName.
-                FILTER(LANG(?placeName) = "en")
-            }}
-        }}
+    
         OPTIONAL {{
             ?item p:P400 ?platformNode.
             ?platformNode ps:P400 ?platformCode.
             ?platformCode rdfs:label ?platformLabel.
-            FILTER(LANG(?platformLabel) = "en").
-        }}
-
-        BIND(COALESCE(?platformLabelFromDate, ?platformLabel) AS ?finalPlatformLabel).
-
-        OPTIONAL {{
-            ?item wdt:P136 ?genre.
-            ?genre rdfs:label ?genreLabel.
-            FILTER(LANG(?genreLabel) = "en").
-        }}
-        OPTIONAL {{
-            ?item wdt:P178 ?developer.
-            ?developer rdfs:label ?developerLabel.
-            FILTER(LANG(?developerLabel) = "en").
-        }}
-        OPTIONAL {{
-            ?item wdt:P123 ?publisher.
-            ?publisher rdfs:label ?publisherLabel.
-            FILTER(LANG(?publisherLabel) = "en").
+            FILTER(LANG(?platformLabel) = "en")
         }}
     }}
-    GROUP BY ?item ?itemLabel ?titleLabel ?publicationDateLabel ?placeName
-    LIMIT {search_page_num}
-    OFFSET {search_offset}
+    GROUP BY ?item ?titleLabel ?platforms
     """
 
     sparql_wikidata = AsyncSparqlWrapper(WIKIDATA_SPARQL_URL)
@@ -163,7 +114,10 @@ async def _search_wikidata(search_title: str, search_page_num: int = 10, search_
         return result.convert()
     
     elif response_code == 429:
-        raise RuntimeError('Too many requests 429 from Wikidata')
+        raise RuntimeError('Too many requests 429 from Wikidata.')
+    
+    elif response_code == 500:
+        raise RuntimeError('Timeout from Wikidata.')
 
 
 def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
@@ -177,12 +131,7 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
     '''
     # TODO GTPS-62 add logic to handle the case where the games are found in game_db.
     wikidata_code = '' # wikidata code
-    genres = ''  # genres
-    developers = ''  # developers
-    publishers = ''  # publishers
-    release_date = ''  # publicationDates
     platforms = ''  # platforms
-    publication_region = '' #placeName
     title = ''  # titleLabel
 
     target_keys = ['item', 'titleLabel']
@@ -193,26 +142,17 @@ def _make_cadidate_list(sparql_response) -> List[Dict[str, str]]:
         if all(key in element for key in target_keys):  # Lower the level of detail here
             temp_wikidata_code = element.get('item', {}).get('value', None)
             wikidata_code = temp_wikidata_code.rsplit('/', 1)[-1] if temp_wikidata_code is not None else None
-            genres = element.get('genres', {}).get('value', None)
-            developers = element.get('developers', {}).get('value', None)
-            publishers = element.get('publishers', {}).get('value', None)
-            release_date = element.get('publicationDateLabel', {}).get('value', None)
-            platforms = element.get('platforms', {}).get('value', None)
-            publication_region = element.get('placeName', {}).get('value', None)
+            platforms = element.get('platforms', {}).get('value', 'not available')
             title = element.get('titleLabel', {}).get('value', None)
             
-            candiate = {
+            candidate = {
                 'wikidata_code': wikidata_code,
-                'genres': genres,
-                'developers': developers,
-                'publishers': publishers,
-                'release_date': _process_release_date(release_date, publication_region),
                 'platforms': platforms,
-                'publication_region': publication_region,
                 'title': title
             }
-            if 'PlayStation' in candiate['platforms']: # filtering for PlayStation
-                game_candiates.append(candiate)
+
+            if 'PlayStation' in candidate.get('platforms'): # filtering for PlayStation
+                game_candiates.append(candidate)
 
     return game_candiates
 
@@ -232,9 +172,8 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], search
     # Create a table to display
     temp = []
     for index, candidate in enumerate(game_candidates):
-        temp.append({'index': index + 1, 'title': candidate.get('title'),
-                    'platforms': candidate.get('platforms'), 'publication_region': candidate.get('publication_region'),
-                    'release_date': candidate.get('release_date')[:10] if candidate.get('release_date') is not None else None})
+        temp.append({'index': index + 1, 'title': candidate.get('title'), 'platforms': candidate.get('platforms'), 
+                     'wikidata': f'https://www.wikidata.org/wiki/{candidate.get('wikidata_code')}'})
     print('Choose the desired game from the list.')
     print(tabulate(temp, headers='keys', tablefmt='rounded_outline'))
 
@@ -252,7 +191,7 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], search
               search_offset = search_offset + search_page_num # if the search is requested with the same title, the next page should be provided.
             await resolve_game_entry(search_title, search_page_num, search_offset) # TODO this part might create an infinite loop.
         elif 1 <= choice <= len(temp):
-            print(f'You selected {temp[choice-1]["title"]} of {temp[choice-1]["release_date"]}')
+            print(f'You selected {temp[choice-1]["title"]}')
             return game_candidates[choice-1]
 
 
