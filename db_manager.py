@@ -1,7 +1,9 @@
 from aiomysql import connect, create_pool, DictCursor, OperationalError, ProgrammingError, IntegrityError
+from async_sparql_wrapper import AsyncSparqlWrapper
 from dotenv import load_dotenv
 import os
-from typing import Any, Tuple, Optional
+from typing import Any, Dict, Tuple, Optional
+from SPARQLWrapper import JSON
 
 
 # load the credential for the DB
@@ -12,6 +14,9 @@ local_db_port = int(os.getenv('LOCAL_SQL_DB_PORT'))
 local_db_user = os.getenv('LOCAL_SQL_DB_USER')
 local_db_passwd = os.getenv('LOCAL_SQL_PASSWD')
 game_db_schema_path = os.path.join(os.getcwd(), 'DB', 'game_db_schema.sql')
+
+# for Wikidata
+WIKIDATA_SPARQL_URL = "https://query.wikidata.org/sparql"
 
 async def create_db(host: str, port: int, user: str, passwd: str, db_name: str, schema_path: str):
     """Creates a database from a schema file.
@@ -63,3 +68,41 @@ async def query_db_with_pool(pool, query: str, values: Optional[Tuple], query_ty
         raise IntegrityError() from e
     except Exception as e:
         print(f'Error occurred while querying : {type(e)} | {e}')
+
+
+async def query_wikidata(query_template: str, values: Dict, search_page_num: int = 10, search_offset: int = 0) -> Any:
+    """Sends SPARQL query to `Wikidata`.
+    
+    Args:
+        query_template: the query template to be sent.
+        values: A dictionary holding the parameterized values for the query.
+        search_page_num: the number of elements checked per search, default to 10. This should be included in the query template
+        search_offset: The number of results to skip from the beginning of the query result set,
+                             in case the desired game is not found and this method is called again.
+                             This should be included in the query template.
+
+    Returns:
+        the response in JSON format
+
+    Raises:
+        RuntimeError: if the response code is either 429 or 500.
+    """
+    values['search_page_num'] = search_page_num
+    values['search_offset'] = search_offset
+    query = query_template.format(**values)
+
+    sparql_wikidata = AsyncSparqlWrapper(WIKIDATA_SPARQL_URL)
+    sparql_wikidata.addCustomHttpHeader("User-Agent", "game_tracker (hyobin90@gmail.com)") # TODO store the project info somewhere else
+    sparql_wikidata.setQuery(query)
+    sparql_wikidata.setReturnFormat(JSON)
+    result = await sparql_wikidata.asyncQuery()
+    response_code = result.response.getcode()
+
+    if response_code == 200:
+        return result.convert()
+    
+    elif response_code == 429:
+        raise RuntimeError('Too many requests 429 from Wikidata.')
+    
+    elif response_code == 500:
+        raise RuntimeError('Timeout from Wikidata.')
