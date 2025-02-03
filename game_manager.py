@@ -66,7 +66,7 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
 
 async def _search_wikidata(search_title, search_page_num, search_offset) -> Any:
     """Searches for a game in Wikidata"""
-    template_search_games = """
+    query_template = """
     SELECT DISTINCT ?item ?titleLabel (GROUP_CONCAT(DISTINCT ?platformLabel; separator=", ") AS ?platforms)
     WHERE {{
         ?item wdt:P31 ?type.
@@ -93,8 +93,10 @@ async def _search_wikidata(search_title, search_page_num, search_offset) -> Any:
     LIMIT {search_page_num}
     OFFSET {search_offset}
     """
-    values = {'search_title':f'{search_title}'}
-    response = await query_wikidata(template_search_games, values, search_page_num, search_offset)
+    values = {'search_title': f'{search_title}',
+              'search_page_num': f'{search_page_num}',
+              'search_offset': f'{search_offset}'}
+    response = await query_wikidata(query_template, values)
     return response
 
 
@@ -168,7 +170,7 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], search
             new_search_title = input('Put the title of the game.\n')
             if search_title == new_search_title:
               search_offset = search_offset + search_page_num # if the search is requested with the same title, the next page should be provided.
-            await resolve_game_entry(search_title, db_connection_pool, search_page_num, search_offset) # TODO this part might create an infinite loop.
+            await resolve_game_entry(new_search_title, db_connection_pool, search_page_num, search_offset) # TODO this part might create an infinite loop.
         elif 1 <= choice <= len(temp):
             print(f'You selected {temp[choice-1]["title"]}')
             return game_candidates[choice-1]
@@ -216,34 +218,174 @@ async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manu
         db_connection_pool: the pool of Connection to use to connect to DB
         manually_created: If True, this entry should be updated in the future.
     """
-    # info from the inital query from Wikidata.
-    wikidata_code = new_game.get('wikidata_code', None)
-    platforms = new_game.get('platforms', '')
-    title = new_game.get('title', '')
-
-    # info to be filled by sending another query to Wikidata.
-    genres = new_game.get('genres', None)
-    developers = new_game.get('developers', None)
-    publishers = new_game.get('publishers', None)
-    release_date = new_game.get('release_date', None)
-    if release_date is not None:
-        release_date = release_date[:10]
-    released = 1 if release_date and datetime.strptime(release_date, '%Y-%m-%d') <= datetime.today() else 0
-    query = f"""
-    USE game_db;
-    INSERT INTO game_table 
-    (wikidata_code, genres, developers, publishers, release_date, released, platforms, title, manually_created)
-    VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);
-    """
-    values = (wikidata_code, genres, developers, publishers, release_date, released, platforms, title, 1 if manually_created else 0)
     try:
-        await query_db_with_pool(db_connection_pool, query, values, 'INSERT')
+        # info from the inital query from Wikidata.
+        wikidata_code = new_game.get('wikidata_code', None)
+        title = new_game.get('title', '')
+
+        # retrieve metadata from Wikidata
+        metadata = await _get_metadata_from_wikidata(wikidata_code)
+
+        # To `game_table`
+        aliases = metadata.get('aliases', None)
+        genres = metadata.get('genres', None)
+        developers = metadata.get('developers', None)
+        publishers = metadata.get('publishers', None)
+        
+        # TODO separate the query into 2
+        query_insert_game = """
+        USE game_db;
+        INSERT INTO game_table 
+        (title, aliases, wikidata_code, genres, developers, publishers, manually_created)
+        VALUES(%s, %s, %s, %s, %s, %s, %s);
+        """
+        value_insert_game = (title, aliases, wikidata_code, genres, developers,
+                             publishers, 1 if manually_created else 0)
+        # Sends query to `game_table` to add the new game.
+        await query_db_with_pool(db_connection_pool, 'INSERT', query_insert_game, value_insert_game)
+
+        # Sends query to retrieve `game_id`
+        query_game_id = """
+        SELECT LAST_INSERT_ID() AS game_id;
+        """
+        game_id_response = await query_db_with_pool(db_connection_pool, 'SELECT', query_game_id)
+        game_id = game_id_response[0].get('game_id', None)
+
+        # To `date_platform_table`
+        dates_and_platforms = metadata.get('dates_and_platforms', {})
+
+        base_query = """
+        USE game_db;
+        INSERT INTO date_platform_table
+        (game_id, release_date, released, platforms, regions)
+        """
+        complete_query = lambda base_query, length: base_query + "VALUE " + ", ".join(['(%s, %s, %s, %s, %s)'] * length) + ';'
+        query_insert_date = complete_query(base_query, len(dates_and_platforms))
+        value_insert_date = tuple()
+        for element in dates_and_platforms:
+            release_date = element.get('release_date', None)
+            released = 0
+            if release_date is not None:
+                release_date = release_date[:10]
+                released = 1 if release_date and datetime.strptime(release_date, '%Y-%m-%d') <= datetime.today() else 0
+            platforms = element.get('platforms', None)
+            regions = element.get('regions', None)
+            value_insert_date += (game_id, release_date, released, platforms, regions) 
+
+        # Sends query to `release table` to add release data platforms and etc.
+        await query_db_with_pool(db_connection_pool, 'INSERT', query_insert_date, value_insert_date)
     except IntegrityError as e:
         raise IntegrityError(f'IntegrityError has occurred. {title} is already present in the DB. Please check. | {e.__cause__}') from e
     except Exception as e:
         # TODO Leave this for catching errors that might happen in the future 
-        print(f'Error occurred while adding a new game into gameDB | {e.__cause__}')
+        print(f'Error occurred while adding a new game into gameDB | {e}')
 
+
+async def _get_metadata_from_wikidata(wikidata_code: str) -> Dict[str, str]:
+    """ Retrieves the following metadata of the target game from `Wikidata`:
+        aliases, genres, developers, publishers, platforms and publication data.
+
+        Args:
+            wikidata_code: the entity code of the target game in `Wikidata`.
+            
+    """
+    template_simple_metadata = """
+    SELECT DISTINCT
+        (GROUP_CONCAT(DISTINCT ?alias; separator=", ") AS ?aliases)
+        (GROUP_CONCAT(DISTINCT ?genreLabel; separator=", ") AS ?genres)
+        (GROUP_CONCAT(DISTINCT ?developerLabel; separator=", ") AS ?developers)
+        (GROUP_CONCAT(DISTINCT ?publisherLabel; separator=", ") AS ?publishers)
+
+    WHERE {{
+        BIND(wd:{wikidata_code} AS ?item)
+        ?item skos:altLabel ?alias.
+        FILTER(LANG(?alias)="en")
+
+        ?item wdt:P136 ?genre.
+        ?genre rdfs:label ?genreLabel.
+        FILTER(LANG(?genreLabel)="en")
+
+        ?item wdt:P178 ?developer.
+        ?developer rdfs:label ?developerLabel.
+        FILTER(LANG(?developerLabel)="en")
+
+        ?item wdt:P123 ?publisher.
+        ?publisher rdfs:label ?publisherLabel.
+        FILTER(LANG(?publisherLabel)="en")
+    }}
+    """
+
+    template_date_platform = """
+        SELECT DISTINCT
+        ?publicationDateLabel 
+        (GROUP_CONCAT(DISTINCT ?finalPlatformLabel; separator=", ") AS ?platforms)
+        ?region
+        WHERE {{
+            BIND(wd:{wikidata_code} AS ?item)
+            OPTIONAL {{
+                ?item p:P577 ?publicationDateNode.
+                FILTER NOT EXISTS {{
+                    ?publicationDateNode pq:P2241 ?deprecationReason
+                }}
+                ?publicationDateNode ps:P577 ?publicationDateLabel.
+                OPTIONAL {{
+                    ?publicationDateNode pq:P400 ?platformNodeFromDate.
+                    ?platformNodeFromDate rdfs:label ?platformLabelFromDate.
+                    FILTER(LANG(?platformLabelFromDate) = "en").
+                }}
+                OPTIONAL {{
+                    ?publicationDateNode pq:P291 ?placeOfDistribution.
+                    ?placeOfDistribution rdfs:label ?region.
+                    FILTER(LANG(?region) = "en")
+                }}
+            }}
+
+            OPTIONAL {{
+                ?item p:P400 ?platformNode.
+                ?platformNode ps:P400 ?platformCode.
+                ?platformCode rdfs:label ?platformLabel.
+                FILTER(LANG(?platformLabel) = "en").
+            }}
+
+            BIND(COALESCE(?platformLabelFromDate, ?platformLabel) AS ?finalPlatformLabel).
+        }}
+
+        GROUP BY ?publicationDateLabel ?platforms ?region
+    """
+    
+    # it's expected to have one entry
+    simple_metadata = await query_wikidata(template_simple_metadata, {'wikidata_code':wikidata_code})
+    # there might be multiple entries
+    date_platform_metadata = await query_wikidata(template_date_platform, {'wikidata_code':wikidata_code})
+
+    aliases = simple_metadata['results']['bindings'][0].get('aliases', {}).get('value', None)
+    genres = simple_metadata['results']['bindings'][0].get('genres', {}).get('value', None)
+    developers = simple_metadata['results']['bindings'][0].get('developers', {}).get('value', None)
+    publishers = simple_metadata['results']['bindings'][0].get('publishers', {}).get('value', None)
+
+    dates_and_platforms: List[Dict[str, str]] = []
+    for element in date_platform_metadata['results']['bindings']:
+        release_date = element.get('publicationDateLabel', {}).get('value', None)
+        platforms = element.get('platforms', {}).get('value', None)
+        regions = element.get('region', {}).get('value', None)
+
+        temp_entry = {
+            'release_date': release_date,
+            'platforms': platforms,
+            'regions': regions
+            }
+
+        dates_and_platforms.append(temp_entry)
+    
+    metadata = {
+        'aliases': aliases,
+        'genres': genres,
+        'developers': developers,
+        'publishers': publishers,
+        'dates_and_platforms': dates_and_platforms
+    }
+
+    return metadata
 
 def _process_release_date(release_date: Optional[str], publication_region: Optional[str]) -> str:
     """Hanldes release dates when it's yyyy-01-01 by modifying it to yyyy-12-31 to indicate the title comes out somewhere in the year.

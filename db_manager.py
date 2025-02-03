@@ -50,7 +50,7 @@ async def init_pool(host: str, port: int, user: str, passwd: str, db_name: str):
     return pool
 
 
-async def query_db_with_pool(pool, query: str, values: Optional[Tuple], query_type: str) -> Optional[Any]:
+async def query_db_with_pool(pool, query_type: str, query: str, values: Optional[Tuple] = None) -> Optional[Any]:
     """Sends a query to DB using Connection pool."""
     try:
         async with pool.acquire() as db_connection:
@@ -68,9 +68,10 @@ async def query_db_with_pool(pool, query: str, values: Optional[Tuple], query_ty
         raise IntegrityError() from e
     except Exception as e:
         print(f'Error occurred while querying : {type(e)} | {e}')
+        raise e from e
 
 
-async def query_wikidata(query_template: str, values: Dict, search_page_num: int = 10, search_offset: int = 0) -> Any:
+async def query_wikidata(query_template: str, values: Dict) -> Any:
     """Sends SPARQL query to `Wikidata`.
     
     Args:
@@ -87,8 +88,6 @@ async def query_wikidata(query_template: str, values: Dict, search_page_num: int
     Raises:
         RuntimeError: if the response code is either 429 or 500.
     """
-    values['search_page_num'] = search_page_num
-    values['search_offset'] = search_offset
     query = query_template.format(**values)
 
     sparql_wikidata = AsyncSparqlWrapper(WIKIDATA_SPARQL_URL)
