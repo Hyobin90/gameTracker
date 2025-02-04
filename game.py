@@ -117,6 +117,7 @@ class Game:
 
     def set_purchase(self) -> None:
         """Sets the purchase date and purchase related status."""
+        # TODO maybe this should be called by the client
         # TODO this can be called when the game is purchased before or after released.
         while True:
             purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\nPlease enter 0, if you haven\'t purchased the game yet.\n')
@@ -135,6 +136,7 @@ class Game:
         
     def set_play_platform(self) -> None:
         """Sets the play platform."""
+        # TODO maybe this should be called by the client
         # TODO this can be called each time the user wants to change the value.
         while True:
             play_platform = input('Please put the device you play this game on between PS4 and PS5.\n')
@@ -147,6 +149,7 @@ class Game:
     
     def set_expectation(self) -> None:
         """Sets the user expectation on the game."""
+        # TODO maybe this should be called by the client
         # TODO this can be called each time the user wants to change the value.
         while True:
             try:

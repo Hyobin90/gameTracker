@@ -24,42 +24,49 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
         search_offset: the number of pages to ignore to retrieve the next batch of pages when searching Wikidata.
     """
     game_of_interest: Game = None
-    game_candidates: List[Dict[str, str]] = []
-    selected_candidate: Dict[str, str] = None
 
     try:
         if not search_title:
             search_title = input('Put the title of the game.\n').lower() # TODO a place holder for the client request.
-        # TODO GTPS-62 Try to get game data from game_db
-        # response = await _search_game_in_gameDB(search_title) # offset feature, is it necessary?
-        # game_candiates = _make_cadidate_list(response) # TODO GTPS-62 making a list of game candidates out of the games found from game DB
 
-        candidate_loop_count = 0
-        candidate_loop_limit = 3
-        while not game_candidates and (candidate_loop_count < candidate_loop_limit):
-            # TODO When the game doesn't exist in game_db 
-            # Try to get metadata of the game in `Wikidata
-            search_offset += search_page_num * candidate_loop_count
+        game_db_search_count = 0
+        game_db_search_list = 3
+        while game_db_search_count < game_db_search_list:
+            # TODO GTPS-62 Try to get game data from game_db
+            search_offset += search_page_num * game_db_search_count
+            game_db_search_count += 1
+
+            response = await _search_gameDB(search_title, search_page_num, search_offset)
+            candidates_from_game_db = _make_cadidate_list(response) # TODO GTPS-62 making a list of game candidates out of the games found from game DB
+            if candidates_from_game_db:
+                # TODO GTPS-76 when the game was not found in gameDB initially, it should be attempted again to send the query to game db here.
+                selected_candidate = await _display_game_candidates(candidates_from_game_db, search_title, search_page_num, search_offset)
+                if selected_candidate:
+                    game_of_interest = _fill_game_entry(selected_candidate)
+                    return game_of_interest
+                else:
+                    continue
+
+        # When the game doesn't exist in game_db 
+        wikidata_search_count = 0
+        wikidata_search_limit = 3
+        while wikidata_search_count < wikidata_search_limit:
+            search_offset += search_page_num * wikidata_search_count
+            wikidata_search_count += 1
+
             response = await _search_wikidata(search_title, search_page_num, search_offset)  # Be careful with search_offset.
-            #pprint.pprint(response) # For debugging
-            game_candidates = _make_cadidate_list(response)
-            candidate_loop_count += 1
-            #print(f'For debugging, game_candidates : {game_candidates}')  # For debugging
-
-            if not game_candidates:
-                #search_title = input(f'Nothing has been found with {search_title}. Please try agin or with another title.\n')
-                continue
-            break
-        
-        if game_candidates:
-            selected_candidate = await _display_game_candidates(game_candidates, search_title, search_page_num, search_offset, db_connection_pool)
-            if candidate_loop_count != 0:
-                await _add_new_game_to_db(selected_candidate, db_connection_pool)
+            candidates_from_wikidata = _make_cadidate_list(response)
+            if candidates_from_wikidata:
+                selected_candidate = await _display_game_candidates(candidates_from_wikidata, search_title, search_page_num, search_offset)
+                if selected_candidate:
+                    await _add_new_game_to_db(selected_candidate, db_connection_pool)
+                else:
+                    continue
+            # when the target game is not found in `Wikidata`
+        if wikidata_search_count == wikidata_search_limit:
+            await _add_new_game_to_db(selected_candidate, db_connection_pool, True)
+            await resolve_game_entry(search_title, db_connection_pool, 10, 0)
                 
-        # TODO GTPS-76 when the game was not found in gameDB initially, it should be attempted again to send the query to game db here.
-        game_of_interest = _fill_game_entry(selected_candidate)
-        return game_of_interest
-
     # Error catching for SPARQL query
     except Exception as e:
         print(f'Error occurred while resolving game entry : {e}')
@@ -168,10 +175,13 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], search
                 continue
             break
         if choice == 0:
-            new_search_title = input('Put the title of the game.\n')
-            if search_title == new_search_title:
-              search_offset = search_offset + search_page_num # if the search is requested with the same title, the next page should be provided.
-            await resolve_game_entry(new_search_title, db_connection_pool, search_page_num, search_offset) # TODO this part might create an infinite loop.
+            # TODO Let's not allow to put another title string within the same searching session.
+
+            # new_search_title = input('Put the title of the game.\n')
+            # if search_title == new_search_title:
+            #   search_offset = search_offset + search_page_num # if the search is requested with the same title, the next page should be provided.
+            # await resolve_game_entry(new_search_title, db_connection_pool, search_page_num, search_offset)
+            return None
         elif 1 <= choice <= len(temp):
             print(f'You selected {temp[choice-1]["title"]}')
             return game_candidates[choice-1]
@@ -199,7 +209,6 @@ def _fill_game_entry(selected_candidate: Dict[str, str]) -> Game:
     else:
         print('The game cannot be found in our database or `WikiData` now.\nCreate the entry manually. Missing details can be filled up later.') # TODO be more specific by asking more info?
         title = input('Please enter the game\'s full title.')
-        _add_new_game_to_db({'title': title}, manually_created) # TODO GTPS-59, in case this is a whole new game. 
 
     game_of_interest = Game(title, manually_created, selected_candidate)
     game_of_interest.set_purchase()
@@ -220,20 +229,23 @@ async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manu
         manually_created: If True, this entry should be updated in the future.
     """
     try:
-        # info from the inital query from Wikidata.
-        wikidata_code = new_game.get('wikidata_code', None)
-        title = new_game.get('title', '')
+        # TODO GTPS-76 divide into two cases
+        if manually_created:
+            
+        if not manually_created:
+            # info from the inital query from Wikidata.
+            title = new_game.get('title', '')
+            wikidata_code = new_game.get('wikidata_code', None)
 
-        # retrieve metadata from Wikidata
-        metadata = await _get_metadata_from_wikidata(wikidata_code)
-
-        # To `game_table`
-        aliases = metadata.get('aliases', None)
-        genres = metadata.get('genres', None)
-        developers = metadata.get('developers', None)
-        publishers = metadata.get('publishers', None)
+            # retrieve metadata from Wikidata if the game exists in `Wikidata`
+            metadata = await _get_metadata_from_wikidata(wikidata_code)
+            aliases = metadata.get('aliases', None)
+            genres = metadata.get('genres', None)
+            developers = metadata.get('developers', None)
+            publishers = metadata.get('publishers', None)
+            dates_and_platforms = metadata.get('dates_and_platforms', {})
         
-        # TODO separate the query into 2
+        # Sends query to `game_table` to add the new game.
         query_insert_game = """
         USE game_db;
         INSERT INTO game_table 
@@ -242,7 +254,6 @@ async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manu
         """
         value_insert_game = (title, aliases, wikidata_code, genres, developers,
                              publishers, 1 if manually_created else 0)
-        # Sends query to `game_table` to add the new game.
         await query_db_with_pool(db_connection_pool, 'INSERT', query_insert_game, value_insert_game)
 
         # Sends query to retrieve `game_id`
@@ -252,9 +263,7 @@ async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manu
         game_id_response = await query_db_with_pool(db_connection_pool, 'SELECT', query_game_id)
         game_id = game_id_response[0].get('game_id', None)
 
-        # To `date_platform_table`
-        dates_and_platforms = metadata.get('dates_and_platforms', {})
-
+        # Sends query to `release table` to add release data platforms and etc.
         base_query = """
         USE game_db;
         INSERT INTO date_platform_table
@@ -272,14 +281,14 @@ async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manu
             platforms = element.get('platforms', None)
             regions = element.get('regions', None)
             value_insert_date += (game_id, release_date, released, platforms, regions) 
-
-        # Sends query to `release table` to add release data platforms and etc.
         await query_db_with_pool(db_connection_pool, 'INSERT', query_insert_date, value_insert_date)
+
     except IntegrityError as e:
         raise IntegrityError(f'IntegrityError has occurred. {title} is already present in the DB. Please check. | {e.__cause__}') from e
     except Exception as e:
-        # TODO Leave this for catching errors that might happen in the future 
+        # TODO Leave this for catching errors that might happen in the future
         print(f'Error occurred while adding a new game into gameDB | {e}')
+        raise e from e
 
 
 async def _get_metadata_from_wikidata(wikidata_code: str) -> Dict[str, str]:
@@ -387,6 +396,7 @@ async def _get_metadata_from_wikidata(wikidata_code: str) -> Dict[str, str]:
     }
 
     return metadata
+
 
 def _process_release_date(release_date: Optional[str]) -> str:
     """Hanldes release dates when it's yyyy-01-01 by modifying it to yyyy-12-31 to indicate the title comes out somewhere in the year.
