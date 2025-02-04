@@ -56,6 +56,7 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
             if candidate_loop_count != 0:
                 await _add_new_game_to_db(selected_candidate, db_connection_pool)
                 
+        # TODO GTPS-76 when the game was not found in gameDB initially, it should be attempted again to send the query to game db here.
         game_of_interest = _fill_game_entry(selected_candidate)
         return game_of_interest
 
@@ -263,7 +264,7 @@ async def _add_new_game_to_db(new_game: Dict[str, str], db_connection_pool, manu
         query_insert_date = complete_query(base_query, len(dates_and_platforms))
         value_insert_date = tuple()
         for element in dates_and_platforms:
-            release_date = element.get('release_date', None)
+            release_date = _process_release_date(element.get('release_date', None))
             released = 0
             if release_date is not None:
                 release_date = release_date[:10]
@@ -387,16 +388,15 @@ async def _get_metadata_from_wikidata(wikidata_code: str) -> Dict[str, str]:
 
     return metadata
 
-def _process_release_date(release_date: Optional[str], publication_region: Optional[str]) -> str:
+def _process_release_date(release_date: Optional[str]) -> str:
     """Hanldes release dates when it's yyyy-01-01 by modifying it to yyyy-12-31 to indicate the title comes out somewhere in the year.
     
     Args:
         release_date: the release date to process.
-        publication_region: the publication region of the game.
     Returns:
         a processed release date.
     """
-    if release_date is None and publication_region is None:
+    if release_date is None:
         return None
     
     release_date = release_date[:10]
@@ -407,3 +407,5 @@ def _process_release_date(release_date: Optional[str], publication_region: Optio
 
     if month == '01' and day == '01':
         return f'{year}-12-31'
+    else:
+        return release_date
