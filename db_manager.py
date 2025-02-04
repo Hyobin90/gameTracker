@@ -67,8 +67,7 @@ async def query_db_with_pool(pool, query_type: str, query: str, values: Optional
     except IntegrityError as e:
         raise IntegrityError() from e
     except Exception as e:
-        print(f'Error occurred while querying : {type(e)} | {e}')
-        raise e from e
+        raise RuntimeError(f'Error occurred while querying | {type(e)} : {e}') from e
 
 
 async def query_wikidata(query_template: str, values: Dict) -> Any:

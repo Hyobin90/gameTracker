@@ -115,54 +115,6 @@ class Game:
     
 
 
-    def set_purchase(self) -> None:
-        """Sets the purchase date and purchase related status."""
-        # TODO maybe this should be called by the client
-        # TODO this can be called when the game is purchased before or after released.
-        while True:
-            purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\nPlease enter 0, if you haven\'t purchased the game yet.\n')
-            if purchase_date == '0':
-                self.purchased = False
-                break
-            elif _validate_date_format(purchase_date):
-                self.purchase_date = datetime.strptime(purchase_date, '%Y-%m-%d')
-                self.purchased = True
-                break
-            else:
-                print(f'Wrong date format: {purchase_date}')
-                continue
-        self.update_status()
-
-        
-    def set_play_platform(self) -> None:
-        """Sets the play platform."""
-        # TODO maybe this should be called by the client
-        # TODO this can be called each time the user wants to change the value.
-        while True:
-            play_platform = input('Please put the device you play this game on between PS4 and PS5.\n')
-            if play_platform not in Platform:
-                print(f'Wrong platform: {play_platform}')
-                continue
-            break
-        self.play_platform = Platform(play_platform)
-
-    
-    def set_expectation(self) -> None:
-        """Sets the user expectation on the game."""
-        # TODO maybe this should be called by the client
-        # TODO this can be called each time the user wants to change the value.
-        while True:
-            try:
-                expectation = int(input('Please put your expectation on this game from 0 to 3, the higher, the more hyped.\n'))
-                if (expectation > 3) or (expectation < 0):
-                    print(f'Invalid value for the expectation: {expectation}')
-                    continue
-                break
-            except ValueError:
-                print(f'Please enter a valid integer.')
-                continue
-        self.expectaion = Expectation(int(expectation)).value
-
 
     def set_game_active(self) ->  None:
         """Set the game currently playing."""
@@ -222,6 +174,57 @@ class Game:
             return (self.release_date - current_date).days
         
 
+
+    def set_purchase(self) -> None:
+        """Sets the purchase date and purchase related status."""
+        # TODO this should be called by the client
+        # TODO this can be called when the game is purchased before or after released.
+        while True:
+            purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\nPlease enter 0, if you haven\'t purchased the game yet.\n')
+            if purchase_date == '0':
+                self.purchased = False
+                break
+            elif _validate_date_format(purchase_date):
+                self.purchase_date = datetime.strptime(purchase_date, '%Y-%m-%d')
+                self.purchased = True
+                break
+            else:
+                print(f'Wrong date format: {purchase_date}')
+                continue
+        self.update_status()
+
+
+
+    # TODO this should be called by the client
+    def set_play_platform(self) -> None:
+        """Sets the play platform."""
+        # TODO this can be called each time the user wants to change the value.
+        while True:
+            play_platform = input('Please put the device you play this game on between PS4 and PS5.\n')
+            if play_platform not in Platform:
+                print(f'Wrong platform: {play_platform}')
+                continue
+            break
+        self.play_platform = Platform(play_platform)
+
+    # TODO this should be called by the client
+    def set_expectation(self) -> None:
+        """Sets the user expectation on the game."""
+        # TODO this can be called each time the user wants to change the value.
+        while True:
+            try:
+                expectation = int(input('Please put your expectation on this game from 0 to 3, the higher, the more hyped.\n'))
+                if (expectation > 3) or (expectation < 0):
+                    print(f'Invalid value for the expectation: {expectation}')
+                    continue
+                break
+            except ValueError:
+                print(f'Please enter a valid integer.')
+                continue
+        self.expectaion = Expectation(int(expectation)).value
+
+
+    # TODO this should be called by the client
     def fill_post_playing_data(self):
         """Fills up certain data after playing"""
         pass
@@ -230,6 +233,7 @@ class Game:
         # self.my_score = 0
 
 
+    # TODO this should be called by the client
     def fill_meta_score(self):
         """Retrieve critics score and user score from `Metacritic`"""
         pass
@@ -238,6 +242,7 @@ class Game:
         # self.meta_user_score = 0
 
 
+    # TODO this should be called by the client
     def fill_open_score(self):
         """Retrieve critics score and user score from `Opencritic`"""
         pass
