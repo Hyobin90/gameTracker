@@ -41,10 +41,9 @@ class Goals(Enum):
 
 class Game:
     """A class to hold metadata on a game"""
-    def __init__(self, title:str, manually_created:bool, wikidata =Dict[str, str]):
+    def __init__(self, title:str, wikidata =Dict[str, str]):
         # Necessary data on the game
         self.title = title
-        self.manually_created = manually_created
 
         # Data from the user
         self.purchase_date = None # this is not stored in game_db
@@ -79,9 +78,6 @@ class Game:
         self.playing = None
         self.played = None
         self.status: Status = None
-
-        if not manually_created:
-            self._fill_metadata_from_wikidata(wikidata) #TODO GTPS-59 prioritize the gameDB
 
 
     def update_status(self) -> None:

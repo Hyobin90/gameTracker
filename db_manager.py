@@ -62,7 +62,7 @@ async def query_db_with_pool(pool, query_type: str, query: str, values: Optional
                 if query_type == 'SELECT':
                     result = await db_cursor.fetchall()
                     return result
-                elif query_type in ('INSERT', 'UPDATE'):
+                elif query_type in ('INSERT', 'UPDATE', 'USE'):
                     await db_connection.commit()
     except IntegrityError as e:
         raise IntegrityError() from e

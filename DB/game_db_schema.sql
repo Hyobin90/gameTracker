@@ -11,8 +11,7 @@ CREATE TABLE IF NOT EXISTS game_table (
     meta_user_score FLOAT UNSIGNED,
 	open_critic_score INT UNSIGNED,
     open_user_score FLOAT UNSIGNED,
-    my_score INT UNSIGNED,
-    manually_created BOOLEAN
+    my_score INT UNSIGNED
 );
 
 CREATE TABLE IF NOT EXISTS date_platform_table (
