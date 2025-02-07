@@ -24,27 +24,28 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
         search_offset: the number of pages to ignore to retrieve the next batch of pages when searching Wikidata.
     """
     try:
-        while True:
-            response = await _search_game_db(search_title, db_connection_pool)
-            candidates_from_game_db = _make_candiate_list_game_db(response)
+        response = await _search_game_db(search_title, db_connection_pool)
+        candidates_from_game_db = _make_candiate_list_game_db(response)
 
-            if candidates_from_game_db:
-                selected_candidate = await _display_game_candidates(candidates_from_game_db, 'game_db')
-                if selected_candidate:
-                    return Game(selected_candidate)
+        if candidates_from_game_db:
+            selected_candidate = await _display_game_candidates(candidates_from_game_db, 'game_db')
+            if selected_candidate:
+                print('The game has been found in game_db')
+                return Game(selected_candidate)
 
-            print('The game was not found in game_db, trying in Wikidata')
-            response = await _search_wikidata(search_title, search_page_num, search_offset)
-            candidates_from_wikidata = _make_cadidate_list_wikidata(response)
+        print('The game was not found in game_db, trying in Wikidata')
+        response = await _search_wikidata(search_title, search_page_num, search_offset)
+        candidates_from_wikidata = _make_cadidate_list_wikidata(response)
 
-            if candidates_from_wikidata:
-                selected_candidate = await _display_game_candidates(candidates_from_wikidata, 'wikidata')
-                if selected_candidate:
-                    await _add_new_game_to_db(db_connection_pool, new_game=selected_candidate)
-                    continue
+        if candidates_from_wikidata:
+            selected_candidate = await _display_game_candidates(candidates_from_wikidata, 'wikidata')
+            if selected_candidate:
+                await _add_return_new_game(db_connection_pool, new_game=selected_candidate)
+                # TODO GTPS-76 return the selected game
+                return Game(selected_candidate)
 
-            print('The game was not even found in Wikidata. Please try again with another name.')
-            return None
+        print('The game was not even found in Wikidata. Please try again with another name.')
+        return None
                 
     except Exception as e:
         raise RuntimeError(f'Error occurred in `resolve_game_entry()`: {e}') from e
@@ -64,10 +65,11 @@ async def _search_game_db(search_title, db_connection_pool) -> Any:
 async def _search_wikidata(search_title, search_page_num, search_offset) -> Any:
     """Searches Wikidata for a game"""
     query_template = """
-    SELECT DISTINCT ?item ?titleLabel (GROUP_CONCAT(DISTINCT ?platformLabel; separator=", ") AS ?platforms)
+    SELECT DISTINCT ?item ?titleLabel ?is_DLC (GROUP_CONCAT(DISTINCT ?platformLabel; separator=", ") AS ?platforms)
     WHERE {{
         ?item wdt:P31 ?type.
-        VALUES ?type {{wd:Q7889 wd:Q64170203}}.
+        VALUES ?type {{wd:Q7889 wd:Q64170203 wd:Q1066707}}.
+        BIND(IF(?type = wd:Q1066707 || ?type = wd:Q209163, 1, 0) AS ?is_DLC).
         
         ?item rdfs:label ?titleLabel.
         FILTER(LANG(?titleLabel)="en").
@@ -86,7 +88,7 @@ async def _search_wikidata(search_title, search_page_num, search_offset) -> Any:
             FILTER(LANG(?platformLabel) = "en")
         }}
     }}
-    GROUP BY ?item ?titleLabel ?platforms
+    GROUP BY ?item ?titleLabel ?is_DLC ?platforms
     LIMIT {search_page_num}
     OFFSET {search_offset}
     """
@@ -119,6 +121,7 @@ def _make_candiate_list_game_db(sql_response) -> List[Dict[str, str]]:
     for element in sql_response:
         candidate = {
             'title': element.get('title', None),
+            'is_DLC': candidate.get('is_DLC', None),
             'aliases': element.get('aliases', None),
             'wikidata_code': element.get('wikidata_code', None),
             'genres': element.get('genres', None),
@@ -149,11 +152,13 @@ def _make_cadidate_list_wikidata(sparql_response) -> List[Dict[str, str]]:
             wikidata_code = temp_wikidata_code.rsplit('/', 1)[-1] if temp_wikidata_code is not None else None
             platforms = element.get('platforms', {}).get('value', 'not available')
             title = element.get('titleLabel', {}).get('value', None)
+            is_dlc = element.get('is_DLC', {}).get('value', None)
             
             candidate = {
                 'wikidata_code': wikidata_code,
                 'platforms': platforms,
-                'title': title
+                'title': title,
+                'is_DLC': is_dlc
             }
 
             if 'PlayStation' in candidate.get('platforms'): # filtering for PlayStation
@@ -177,13 +182,15 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], data_s
         if data_source == 'game_db':
             temp.append({'index': index + 1,
                          'title': candidate.get('title'),
+                         'is_DLC': candidate.get('is_DLC'),
                          'genres': candidate.get('genres', 'N/A'),
                          'developers': candidate.get('developers', 'N/A'),
                          'publishers': candidate.get('publishers', 'N/A'),
-                         'wikidata': f'https://www.wikidata.org/wiki/{candidate.get('wikidata_code')}' if candidate.get('wikidata_code', None) == None else 'N/A'})
+                         'wikidata': f'https://www.wikidata.org/wiki/{candidate.get('wikidata_code')}' if candidate.get('wikidata_code', None) != None else 'N/A'})
         elif data_source == 'wikidata':
             temp.append({'index': index + 1,
                          'title': candidate.get('title'),
+                         'is_DLC': candidate.get('is_DLC'),
                          'platforms': candidate.get('platforms'), 
                          'wikidata': f'https://www.wikidata.org/wiki/{candidate.get('wikidata_code')}'})
     print('Choose the desired game from the list.')
@@ -192,7 +199,7 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], data_s
     while True:
         while True:
             try:
-                choice = int(input('Enter the number of the game that you want.\nIf you want to search for the same title one more time, press 0.\n'))
+                choice = int(input('Enter the number of the game that you want.\nIf the desired game is not in the list, press 0.\n'))
             except ValueError:
                 print('Please enter a valid number.\nIf the desired is not present in the list, press 0.\n')
                 continue
@@ -204,15 +211,19 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], data_s
             return game_candidates[choice-1]
 
 
-async def _add_new_game_to_db(db_connection_pool, new_game: Dict[str, str]):
-    """Adds a new game to the game DB by sending a query to `game_db`.
+async def _add_return_new_game(db_connection_pool, new_game: Dict[str, str]) -> Game:
+    """Adds a new game into `game_db` and return it as Game.
     
     Args:
+        db_connection_pool: the pool of Connection to use to connect to DB.
         new_game: a dictionary of a new game to be added into game_db.
-        db_connection_pool: the pool of Connection to use to connect to DB
+
+    Returns:
+        An instance of Game of the new game.
     """
 
     title = None
+    is_DLC = None
     wikidata_code = None
     aliases = None
     genres = None
@@ -221,10 +232,11 @@ async def _add_new_game_to_db(db_connection_pool, new_game: Dict[str, str]):
     dates_and_platforms = None
 
     try:
-        title = new_game.get('title', '')
-        wikidata_code = new_game.get('wikidata_code', None)
+        title = new_game.get('title')
+        is_DLC = new_game.get('is_DLC')
+        wikidata_code = new_game.get('wikidata_code')
 
-        metadata = await _get_metadata_from_wikidata(wikidata_code) # retrieve metadata from Wikidata if the game exists in `Wikidata`
+        metadata = await _get_metadata_from_wikidata(wikidata_code)
         # TODO Implement features for the critics
         # metascores = get_metacritic()
         # openscores = get_opencritic()
@@ -238,17 +250,14 @@ async def _add_new_game_to_db(db_connection_pool, new_game: Dict[str, str]):
         query_insert_game = """
         USE game_db;
         INSERT INTO game_table 
-        (title, aliases, wikidata_code, genres, developers, publishers)
-        VALUES(%s, %s, %s, %s, %s, %s);
+        (title, is_DLC, aliases, wikidata_code, genres, developers, publishers)
+        VALUES(%s, %s, %s, %s, %s, %s, %s);
         """
-        value_insert_game = (title, aliases, wikidata_code, genres, developers, publishers)
+        value_insert_game = (title, is_DLC, aliases, wikidata_code, genres, developers, publishers)
         await query_db_with_pool(db_connection_pool, 'INSERT', query_insert_game, value_insert_game)
 
         # Sends query to retrieve `game_id`
-        query_game_id = """
-        SELECT LAST_INSERT_ID() AS game_id;
-        """
-        game_id_response = await query_db_with_pool(db_connection_pool, 'SELECT', query_game_id)
+        game_id_response = await query_db_with_pool(db_connection_pool, 'SELECT', 'SELECT LAST_INSERT_ID() AS game_id;')
         game_id = game_id_response[0].get('game_id', None)
 
         # Sends query to `release table` to add release data platforms and etc.
@@ -268,13 +277,13 @@ async def _add_new_game_to_db(db_connection_pool, new_game: Dict[str, str]):
                 released = 1 if release_date and datetime.strptime(release_date, '%Y-%m-%d') <= datetime.today() else 0
             platforms = element.get('platforms', None)
             regions = element.get('regions', None)
-            value_insert_data += (game_id, release_date, released, platforms, regions) 
+            value_insert_data += (game_id, release_date, released, platforms, regions)
         await query_db_with_pool(db_connection_pool, 'INSERT', query_insert_data, value_insert_data)
 
     except IntegrityError as e:
         raise IntegrityError(f'IntegrityError has occurred. {title} is already present in the DB. Please check. | {e.__cause__}') from e
     except Exception as e:
-        raise RuntimeError(f'Error occurred in `_add_new_game_to_db()` | {e}') from e
+        raise RuntimeError(f'Error occurred in `_add_return_new_game()` | {e}') from e
 
 
 async def _get_metadata_from_wikidata(wikidata_code: str) -> Dict[str, str]:
@@ -283,7 +292,7 @@ async def _get_metadata_from_wikidata(wikidata_code: str) -> Dict[str, str]:
 
         Args:
             wikidata_code: the entity code of the target game in `Wikidata`.
-            
+ 
     """
     template_simple_metadata = """
     SELECT DISTINCT
@@ -294,20 +303,28 @@ async def _get_metadata_from_wikidata(wikidata_code: str) -> Dict[str, str]:
 
     WHERE {{
         BIND(wd:{wikidata_code} AS ?item)
-        ?item skos:altLabel ?alias.
-        FILTER(LANG(?alias)="en")
+        OPTIONAL {{
+            ?item skos:altLabel ?alias.
+            FILTER(LANG(?alias)="en")
+        }}
 
-        ?item wdt:P136 ?genre.
-        ?genre rdfs:label ?genreLabel.
-        FILTER(LANG(?genreLabel)="en")
+        OPTIONAL {{
+            ?item wdt:P136 ?genre.
+            ?genre rdfs:label ?genreLabel.
+            FILTER(LANG(?genreLabel)="en")
+        }}
 
-        ?item wdt:P178 ?developer.
-        ?developer rdfs:label ?developerLabel.
-        FILTER(LANG(?developerLabel)="en")
+        OPTIONAL {{
+            ?item wdt:P178 ?developer.
+            ?developer rdfs:label ?developerLabel.
+            FILTER(LANG(?developerLabel)="en")
+        }}
 
-        ?item wdt:P123 ?publisher.
-        ?publisher rdfs:label ?publisherLabel.
-        FILTER(LANG(?publisherLabel)="en")
+        OPTIONAL {{
+            ?item wdt:P123 ?publisher.
+            ?publisher rdfs:label ?publisherLabel.
+            FILTER(LANG(?publisherLabel)="en")
+        }}
     }}
     """
 

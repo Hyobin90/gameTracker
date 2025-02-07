@@ -42,6 +42,8 @@ async def create_db(host: str, port: int, user: str, passwd: str, db_name: str, 
             await create_db(local_db_host, local_db_port, local_db_user, local_db_passwd, 'game_db', game_db_schema_path)
     except ProgrammingError as e:
         print(f'Error occurred while creating DB: {e}')
+    except Exception as e:
+        raise Exception(f'Error occurred in `create_db()`: {e}') from e
 
 
 async def init_pool(host: str, port: int, user: str, passwd: str, db_name: str):

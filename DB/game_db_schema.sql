@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS game_table (
     title VARCHAR(255) NOT NULL,
     aliases VARCHAR(1024),
 	wikidata_code VARCHAR(100) UNIQUE,
+    is_DLC BOOLEAN,
+    parent VARCHAR(255) NOT NULL,
     genres VARCHAR(1024),
     developers VARCHAR(255),
     publishers VARCHAR(255),
@@ -10,8 +12,7 @@ CREATE TABLE IF NOT EXISTS game_table (
     meta_critic_score INT UNSIGNED,
     meta_user_score FLOAT UNSIGNED,
 	open_critic_score INT UNSIGNED,
-    open_user_score FLOAT UNSIGNED,
-    my_score INT UNSIGNED
+    open_user_score FLOAT UNSIGNED
 );
 
 CREATE TABLE IF NOT EXISTS date_platform_table (
