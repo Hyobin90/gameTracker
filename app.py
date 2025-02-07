@@ -1,8 +1,8 @@
 """ Entry point of the app """
 import asyncio
 import argparse
-from db_manager import create_db, init_pool, local_db_host, local_db_passwd, local_db_port, local_db_user, game_db_schema_path
-from game_manager import resolve_game_entry, _add_new_game_to_db
+from db_manager import create_db, init_pool, local_db_host, local_db_passwd, local_db_port, local_db_user, game_db_schema_path, query_db_with_pool
+from game_manager import resolve_game_entry
 import os
 
 
@@ -10,7 +10,7 @@ async def main():
     # Initialize `game_db`
     await create_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
     db_connection_pool = await init_pool(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db')
-    await resolve_game_entry('crimson desert', db_connection_pool)
+    await resolve_game_entry('The Witcher 3: Wild Hunt – Hearts of stone', db_connection_pool)
 
     # The last to step before closing the app
     db_connection_pool.close()

@@ -41,10 +41,9 @@ class Goals(Enum):
 
 class Game:
     """A class to hold metadata on a game"""
-    def __init__(self, title:str, manually_created:bool, wikidata =Dict[str, str]):
+    def __init__(self, title:str, wikidata =Dict[str, str]):
         # Necessary data on the game
         self.title = title
-        self.manually_created = manually_created
 
         # Data from the user
         self.purchase_date = None # this is not stored in game_db
@@ -80,9 +79,6 @@ class Game:
         self.played = None
         self.status: Status = None
 
-        if not manually_created:
-            self._fill_metadata_from_wikidata(wikidata) #TODO GTPS-59 prioritize the gameDB
-
 
     def update_status(self) -> None:
         """Centralizes updating the status of the game based on `released`, `purchased`, and `playing`"""
@@ -114,51 +110,6 @@ class Game:
             print(f'Error occurred while updating Game status : {e}')
     
 
-
-    def set_purchase(self) -> None:
-        """Sets the purchase date and purchase related status."""
-        # TODO this can be called when the game is purchased before or after released.
-        while True:
-            purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\nPlease enter 0, if you haven\'t purchased the game yet.\n')
-            if purchase_date == '0':
-                self.purchased = False
-                break
-            elif _validate_date_format(purchase_date):
-                self.purchase_date = datetime.strptime(purchase_date, '%Y-%m-%d')
-                self.purchased = True
-                break
-            else:
-                print(f'Wrong date format: {purchase_date}')
-                continue
-        self.update_status()
-
-        
-    def set_play_platform(self) -> None:
-        """Sets the play platform."""
-        # TODO this can be called each time the user wants to change the value.
-        while True:
-            play_platform = input('Please put the device you play this game on between PS4 and PS5.\n')
-            if play_platform not in Platform:
-                print(f'Wrong platform: {play_platform}')
-                continue
-            break
-        self.play_platform = Platform(play_platform)
-
-    
-    def set_expectation(self) -> None:
-        """Sets the user expectation on the game."""
-        # TODO this can be called each time the user wants to change the value.
-        while True:
-            try:
-                expectation = int(input('Please put your expectation on this game from 0 to 3, the higher, the more hyped.\n'))
-                if (expectation > 3) or (expectation < 0):
-                    print(f'Invalid value for the expectation: {expectation}')
-                    continue
-                break
-            except ValueError:
-                print(f'Please enter a valid integer.')
-                continue
-        self.expectaion = Expectation(int(expectation)).value
 
 
     def set_game_active(self) ->  None:
@@ -219,6 +170,57 @@ class Game:
             return (self.release_date - current_date).days
         
 
+
+    def set_purchase(self) -> None:
+        """Sets the purchase date and purchase related status."""
+        # TODO this should be called by the client
+        # TODO this can be called when the game is purchased before or after released.
+        while True:
+            purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\nPlease enter 0, if you haven\'t purchased the game yet.\n')
+            if purchase_date == '0':
+                self.purchased = False
+                break
+            elif _validate_date_format(purchase_date):
+                self.purchase_date = datetime.strptime(purchase_date, '%Y-%m-%d')
+                self.purchased = True
+                break
+            else:
+                print(f'Wrong date format: {purchase_date}')
+                continue
+        self.update_status()
+
+
+
+    # TODO this should be called by the client
+    def set_play_platform(self) -> None:
+        """Sets the play platform."""
+        # TODO this can be called each time the user wants to change the value.
+        while True:
+            play_platform = input('Please put the device you play this game on between PS4 and PS5.\n')
+            if play_platform not in Platform:
+                print(f'Wrong platform: {play_platform}')
+                continue
+            break
+        self.play_platform = Platform(play_platform)
+
+    # TODO this should be called by the client
+    def set_expectation(self) -> None:
+        """Sets the user expectation on the game."""
+        # TODO this can be called each time the user wants to change the value.
+        while True:
+            try:
+                expectation = int(input('Please put your expectation on this game from 0 to 3, the higher, the more hyped.\n'))
+                if (expectation > 3) or (expectation < 0):
+                    print(f'Invalid value for the expectation: {expectation}')
+                    continue
+                break
+            except ValueError:
+                print(f'Please enter a valid integer.')
+                continue
+        self.expectaion = Expectation(int(expectation)).value
+
+
+    # TODO this should be called by the client
     def fill_post_playing_data(self):
         """Fills up certain data after playing"""
         pass
@@ -227,6 +229,7 @@ class Game:
         # self.my_score = 0
 
 
+    # TODO this should be called by the client
     def fill_meta_score(self):
         """Retrieve critics score and user score from `Metacritic`"""
         pass
@@ -235,6 +238,7 @@ class Game:
         # self.meta_user_score = 0
 
 
+    # TODO this should be called by the client
     def fill_open_score(self):
         """Retrieve critics score and user score from `Opencritic`"""
         pass
