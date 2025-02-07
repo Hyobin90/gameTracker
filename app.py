@@ -10,7 +10,7 @@ async def main():
     # Initialize `game_db`
     await create_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
     db_connection_pool = await init_pool(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db')
-    await resolve_game_entry('god of war ragnarok', db_connection_pool)
+    await resolve_game_entry('The Witcher 3: Wild Hunt – Hearts of stone', db_connection_pool)
 
     # The last to step before closing the app
     db_connection_pool.close()

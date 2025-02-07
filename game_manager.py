@@ -28,9 +28,11 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
         candidates_from_game_db = _make_candiate_list_game_db(response)
 
         if candidates_from_game_db:
-            selected_candidate = await _display_game_candidates(candidates_from_game_db, 'game_db')
+            selected_candidate = _display_game_candidates(candidates_from_game_db, 'game_db')
             if selected_candidate:
                 print('The game has been found in game_db')
+                # TODO GTPS-49 have it return the data from game_table and date_platform_table no in Game
+                # TODO change required for the client
                 return Game(selected_candidate)
 
         print('The game was not found in game_db, trying in Wikidata')
@@ -38,10 +40,12 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
         candidates_from_wikidata = _make_cadidate_list_wikidata(response)
 
         if candidates_from_wikidata:
-            selected_candidate = await _display_game_candidates(candidates_from_wikidata, 'wikidata')
+            selected_candidate = _display_game_candidates(candidates_from_wikidata, 'wikidata')
             if selected_candidate:
                 await _add_return_new_game(db_connection_pool, new_game=selected_candidate)
-                # TODO GTPS-76 return the selected game
+                # TODO GTPS-49 have it return the data from game_table and date_platform_table no in Game
+                # TODO GTPS-49 have it return the new game data right away(game_table, date_platform_table)
+                # TODO change required for the client
                 return Game(selected_candidate)
 
         print('The game was not even found in Wikidata. Please try again with another name.')
@@ -68,7 +72,7 @@ async def _search_wikidata(search_title, search_page_num, search_offset) -> Any:
     SELECT DISTINCT ?item ?titleLabel ?is_DLC (GROUP_CONCAT(DISTINCT ?platformLabel; separator=", ") AS ?platforms)
     WHERE {{
         ?item wdt:P31 ?type.
-        VALUES ?type {{wd:Q7889 wd:Q64170203 wd:Q1066707}}.
+        VALUES ?type {{wd:Q7889 wd:Q64170203 wd:Q1066707 wd:Q209163}}.
         BIND(IF(?type = wd:Q1066707 || ?type = wd:Q209163, 1, 0) AS ?is_DLC).
         
         ?item rdfs:label ?titleLabel.
@@ -121,7 +125,7 @@ def _make_candiate_list_game_db(sql_response) -> List[Dict[str, str]]:
     for element in sql_response:
         candidate = {
             'title': element.get('title', None),
-            'is_DLC': candidate.get('is_DLC', None),
+            'is_DLC': element.get('is_DLC', None),
             'aliases': element.get('aliases', None),
             'wikidata_code': element.get('wikidata_code', None),
             'genres': element.get('genres', None),
@@ -148,26 +152,25 @@ def _make_cadidate_list_wikidata(sparql_response) -> List[Dict[str, str]]:
 
     for element in sparql_response['results']['bindings']:  # -> List of Dicts, `element` is a dict
         if all(key in element for key in target_keys):  # Lower the level of detail here
-            temp_wikidata_code = element.get('item', {}).get('value', None)
-            wikidata_code = temp_wikidata_code.rsplit('/', 1)[-1] if temp_wikidata_code is not None else None
+            wikidata_link = element.get('item', {}).get('value', None)
             platforms = element.get('platforms', {}).get('value', 'not available')
             title = element.get('titleLabel', {}).get('value', None)
             is_dlc = element.get('is_DLC', {}).get('value', None)
             
             candidate = {
-                'wikidata_code': wikidata_code,
+                'wikidata_link': wikidata_link,
                 'platforms': platforms,
                 'title': title,
                 'is_DLC': is_dlc
             }
 
-            if 'PlayStation' in candidate.get('platforms'): # filtering for PlayStation
-                game_candiates.append(candidate)
+            game_candiates.append(candidate)
 
     return game_candiates
 
 
-async def _display_game_candidates(game_candidates: List[Dict[str, str]], data_source: str) -> Optional[Dict[str, str]]:
+def _display_game_candidates(game_candidates: List[Dict[str, str]], data_source: str) -> Optional[Dict[str, str]]:
+    # GTPS-49 for the client
     """Displays found candidates to the user to choose.
     
     Args:
@@ -182,18 +185,18 @@ async def _display_game_candidates(game_candidates: List[Dict[str, str]], data_s
         if data_source == 'game_db':
             temp.append({'index': index + 1,
                          'title': candidate.get('title'),
-                         'is_DLC': candidate.get('is_DLC'),
+                         'is_DLC': 'Yes' if candidate.get('is_DLC') == 1 else 'No',
                          'genres': candidate.get('genres', 'N/A'),
                          'developers': candidate.get('developers', 'N/A'),
                          'publishers': candidate.get('publishers', 'N/A'),
-                         'wikidata': f'https://www.wikidata.org/wiki/{candidate.get('wikidata_code')}' if candidate.get('wikidata_code', None) != None else 'N/A'})
+                         'wikidata': f"https://www.wikidata.org/wiki/{candidate.get('wikidata_code')}" if candidate.get('wikidata_code', None) != None else 'N/A'})
         elif data_source == 'wikidata':
             temp.append({'index': index + 1,
                          'title': candidate.get('title'),
                          'is_DLC': candidate.get('is_DLC'),
                          'platforms': candidate.get('platforms'), 
-                         'wikidata': f'https://www.wikidata.org/wiki/{candidate.get('wikidata_code')}'})
-    print('Choose the desired game from the list.')
+                         'wikidata': candidate.get('wikidata_link')})
+    print('Choose the desired game or parent game from the list.')
     print(tabulate(temp, headers='keys', tablefmt='rounded_outline'))
 
     while True:
@@ -230,11 +233,12 @@ async def _add_return_new_game(db_connection_pool, new_game: Dict[str, str]) -> 
     developers = None
     publishers = None
     dates_and_platforms = None
+    parent_id = 'N/A'
 
     try:
         title = new_game.get('title')
-        is_DLC = new_game.get('is_DLC')
-        wikidata_code = new_game.get('wikidata_code')
+        is_DLC = True if new_game.get('is_DLC') == '1' else False
+        wikidata_code = new_game.get('wikidata_link').rsplit('/', 1)[-1]
 
         metadata = await _get_metadata_from_wikidata(wikidata_code)
         # TODO Implement features for the critics
@@ -246,14 +250,22 @@ async def _add_return_new_game(db_connection_pool, new_game: Dict[str, str]) -> 
         publishers = metadata.get('publishers', None)
         dates_and_platforms = metadata.get('dates_and_platforms', {})
 
+        if is_DLC:
+            parent = await _find_parent(title, db_connection_pool)
+            parent_id = parent.get('game_id')
+            aliases += parent.get('aliases', '')
+            genres += parent.get('genres', '')
+            developers += parent.get('developers', '')
+            publishers += parent.get('publishers', '')
+
         # Sends query to `game_table` to add the new game.
         query_insert_game = """
         USE game_db;
         INSERT INTO game_table 
-        (title, is_DLC, aliases, wikidata_code, genres, developers, publishers)
-        VALUES(%s, %s, %s, %s, %s, %s, %s);
+        (title, is_DLC, aliases, wikidata_code, genres, developers, publishers, parent_id)
+        VALUES(%s, %s, %s, %s, %s, %s, %s, %s);
         """
-        value_insert_game = (title, is_DLC, aliases, wikidata_code, genres, developers, publishers)
+        value_insert_game = (title, is_DLC, aliases, wikidata_code, genres, developers, publishers, parent_id)
         await query_db_with_pool(db_connection_pool, 'INSERT', query_insert_game, value_insert_game)
 
         # Sends query to retrieve `game_id`
@@ -422,3 +434,12 @@ def _process_release_date(release_date: Optional[str]) -> str:
         return f'{year}-12-31'
     else:
         return release_date
+
+
+async def _find_parent(title: str, db_connection_pool):
+    """Finds and returns the parent game of a DLC."""
+    parent_query = 'SELECT * FROM game_table WHERE MATCH(title, aliases) AGAINST(%s IN NATURAL LANGUAGE MODE);'
+    parent_values = (title)
+    parent_candiates = await query_db_with_pool(db_connection_pool, 'SELECT', parent_query, parent_values)
+    selected_parent = _display_game_candidates(parent_candiates, 'game_db') # GTPS-49 Move to the client
+    return selected_parent
