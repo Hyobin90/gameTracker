@@ -50,17 +50,17 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
 
         print('The game was not even found in Wikidata. Please try again with another name.')
         return None
-                
+    
+    except IntegrityError as e:
+        raise IntegrityError(f'IntegrityError has occurred. | {e.__cause__}') from e
     except Exception as e:
         raise RuntimeError(f'Error occurred in `resolve_game_entry()`: {e}') from e
 
 
 async def _search_game_db(search_title, db_connection_pool) -> Any:
     """Searches game_db for a game"""
-    select_query = """
-    SELECT * FROM game_table WHERE LCASE(title) = LCASE(%s) OR LCASE(aliases) LIKE CONCAT('%%', LCASE(%s), '%%');
-    """
-    select_values = (search_title, search_title)
+    select_query = 'SELECT * FROM game_table WHERE MATCH(title, aliases) AGAINST(%s IN NATURAL LANGUAGE MODE);'
+    select_values = (search_title)
     await query_db_with_pool(db_connection_pool, 'USE', 'USE game_db;')
     response = await query_db_with_pool(db_connection_pool, 'SELECT', select_query, select_values)
     return response
@@ -251,12 +251,16 @@ async def _add_return_new_game(db_connection_pool, new_game: Dict[str, str]) -> 
         dates_and_platforms = metadata.get('dates_and_platforms', {})
 
         if is_DLC:
-            parent = await _find_parent(title, db_connection_pool)
-            parent_id = parent.get('game_id')
-            aliases += parent.get('aliases', '')
-            genres += parent.get('genres', '')
-            developers += parent.get('developers', '')
-            publishers += parent.get('publishers', '')
+            response = await _search_game_db(title, db_connection_pool)
+            parent_cadiates_from_game_db = _make_candiate_list_game_db(response)
+            selected_parent = _display_game_candidates(parent_cadiates_from_game_db, 'game_db')
+            if not selected_parent:
+                raise RuntimeError(f'The original game of {title} is not present in `game_db`')
+            parent_id = selected_parent.get('game_id')
+            aliases += selected_parent.get('aliases', '')
+            genres += selected_parent.get('genres', '')
+            developers += selected_parent.get('developers', '')
+            publishers += selected_parent.get('publishers', '')
 
         # Sends query to `game_table` to add the new game.
         query_insert_game = """
@@ -434,12 +438,3 @@ def _process_release_date(release_date: Optional[str]) -> str:
         return f'{year}-12-31'
     else:
         return release_date
-
-
-async def _find_parent(title: str, db_connection_pool):
-    """Finds and returns the parent game of a DLC."""
-    parent_query = 'SELECT * FROM game_table WHERE MATCH(title, aliases) AGAINST(%s IN NATURAL LANGUAGE MODE);'
-    parent_values = (title)
-    parent_candiates = await query_db_with_pool(db_connection_pool, 'SELECT', parent_query, parent_values)
-    selected_parent = _display_game_candidates(parent_candiates, 'game_db') # GTPS-49 Move to the client
-    return selected_parent
