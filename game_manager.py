@@ -2,11 +2,9 @@
 from datetime import datetime
 from db_manager import query_db_with_pool, IntegrityError, query_wikidata
 from game import Game
-from SPARQLWrapper import JSON
+import httpx
 from tabulate import tabulate # temp mesure for user interaction
 from typing import Any, Dict, List, Optional
-import re
-import pprint
 
 
 URL_METACRITIC = 'https://www.metacritic.com/game/'
@@ -36,7 +34,7 @@ async def resolve_game_entry(search_title: str, db_connection_pool, search_page_
                 return Game(selected_candidate)
 
         print('The game was not found in game_db, trying in Wikidata')
-        response = await _search_wikidata(search_title, search_page_num, search_offset)
+        response = _cirrus_searrch_wikidata(search_title)
         candidates_from_wikidata = _make_cadidate_list_wikidata(response)
 
         if candidates_from_wikidata:
@@ -65,6 +63,43 @@ async def _search_game_db(search_title, db_connection_pool) -> Any:
     response = await query_db_with_pool(db_connection_pool, 'SELECT', select_query, select_values)
     return response
 
+
+def _search_for_wikidata_code(search_title: str) -> List[str]:
+    """Searches Wikidata to get the entity codes of entitis that match the search title."""
+    url = 'https://www.wikidata.org/w/api.php'
+    params = {
+        'action': 'query',
+        'list': 'search',
+        'srsearch': search_title,
+        'srnamespace': 0,
+        'format': 'json'
+    }
+
+    response = httpx.get(url=url, params=params)
+    response.raise_for_status()
+    data = response.json()
+    codes = []
+    for element in data['query']['search']:
+        codes.append(element['title'])
+    return codes
+
+
+def _saerch_for_games_with_codes(codes: List[str]) -> Any:
+    """With the given Wikidata entity codes, retrieve the entities."""
+    formatted_codes = '| '.join(codes)
+    url = 'https://www.wikidata.org/w/api.php'
+    params = {
+        'action': 'query',
+        'list': 'search',
+        'srsearch': formatted_codes,
+        'srnamespace': 0,
+        'format': 'json'
+    }
+
+    response = httpx.get(url=url, params=params)
+    response.raise_for_status()
+    data = response.json()
+    return data
 
 async def _search_wikidata(search_title, search_page_num, search_offset) -> Any:
     """Searches Wikidata for a game"""
