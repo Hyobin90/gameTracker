@@ -5,7 +5,6 @@ import os
 from typing import Any, Dict, Tuple, Optional
 from SPARQLWrapper import JSON
 
-
 # load the credential for the DB
 load_dotenv()
 

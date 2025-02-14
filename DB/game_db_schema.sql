@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS game_table (
     genres VARCHAR(1024),
     developers VARCHAR(255),
     publishers VARCHAR(255),
+    platforms VARCHAR(255),
     pro_enhanced BOOLEAN,
     meta_critic_score INT UNSIGNED,
     meta_user_score FLOAT UNSIGNED,
