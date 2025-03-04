@@ -11,7 +11,7 @@ async def main():
     await create_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
     db_connection_pool = await init_pool(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db')
     game_manager = GameManager()
-    game = await game_manager.resolve_game_entry('ninja gaiden 4', db_connection_pool)
+    game = await game_manager.resolve_game_entry('Amplitude', db_connection_pool)
 
     # The last to step before closing the app
     db_connection_pool.close()
@@ -29,4 +29,5 @@ asyncio.run(main())
 #     args = arg_parser.parse_args()
 
 #     asyncio.run(resolve_game_entry(args.search_title, args.page_num, args.offset))
+
 
