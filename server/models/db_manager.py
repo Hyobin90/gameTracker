@@ -1,5 +1,5 @@
 from aiomysql import connect, create_pool, DictCursor, OperationalError, ProgrammingError, IntegrityError
-from async_sparql_wrapper import AsyncSparqlWrapper
+from utils.async_sparql_wrapper import AsyncSparqlWrapper
 from dotenv import load_dotenv
 import os
 from typing import Any, Dict, Tuple, Optional

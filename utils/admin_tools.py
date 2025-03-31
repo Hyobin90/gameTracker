@@ -1,13 +1,14 @@
 import asyncio
-from db_manager import create_db, init_pool, local_db_host, local_db_passwd, local_db_port, local_db_user, game_db_schema_path, query_db_with_pool
-from game_manager import GameManager
+from server.models.db_manager import create_db, init_pool, local_db_host, local_db_passwd, local_db_port, local_db_user, game_db_schema_path, query_db_with_pool
+from server.controller.game_manager import GameManager
 import os
 import json
 from pprint import pprint
 import re
 
 
-async def main():
+async def fill_up_game_db():
+    """Fills up the game db from Wikidata using a given json file"""
     # Initialize `game_db`
     await create_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
     db_connection_pool = await init_pool(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db')
@@ -33,5 +34,5 @@ async def main():
     db_connection_pool.close()
     await db_connection_pool.wait_closed()
 
-asyncio.run(main())
+asyncio.run(fill_up_game_db())
 
