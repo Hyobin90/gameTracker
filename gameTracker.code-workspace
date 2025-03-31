@@ -7,5 +7,7 @@
 			"path": "../sandbox"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "game_tracker"
+	}
 }

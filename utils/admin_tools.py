@@ -7,7 +7,7 @@ from pprint import pprint
 import re
 
 
-async def main():
+async def fill_up_game_db():
     """Fills up the game db from Wikidata using a given json file"""
     # Initialize `game_db`
     await create_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
@@ -34,5 +34,5 @@ async def main():
     db_connection_pool.close()
     await db_connection_pool.wait_closed()
 
-asyncio.run(main())
+asyncio.run(fill_up_game_db())
 

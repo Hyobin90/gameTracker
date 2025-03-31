@@ -1,7 +1,7 @@
 """Manage games by registering, and updating them."""
 from datetime import datetime
 from server.models.db_manager import query_db_with_pool, IntegrityError
-from server.controller.game import Game
+from server.models.game import Game
 import httpx
 from tabulate import tabulate # temp mesure for user interaction
 from typing import Any, Dict, List, Optional, Union
