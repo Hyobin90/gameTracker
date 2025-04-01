@@ -1,33 +1,21 @@
-""" Entry point of the app """
-import asyncio
-import argparse
-from server.models.db_manager import create_db, init_pool, local_db_host, local_db_passwd, local_db_port, local_db_user, game_db_schema_path, query_db_with_pool
+from flask import Flask, jsonify, request, render_template, make_response, session
+from flask_login import LoginManager, current_user, login_required, login_user, logout_user
+from flask_cors import CORS
 import os
-from server.controller.game_manager import GameManager
 
+# A configuration for allowing testing features in `HTTP` that are only available for `HTTPS`
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-async def main():
-    # Initialize `game_db`
-    await create_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
-    db_connection_pool = await init_pool(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db')
-    game_manager = GameManager()
-    game = await game_manager.resolve_game_entry('Amplitude', db_connection_pool)
+# Flask Server instance
+app = Flask(__name__, static_url_path='/client/static')
+CORS(app) # For Cross Origin Resource Sharing
+app.secret_key = 'test_key' # TODO Temporarily, a fixed key is used to keep the sessions, testing purpose
 
-    # The last to step before closing the app
-    db_connection_pool.close()
-    await db_connection_pool.wait_closed()
+# Login Manager
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.session_protection = 'strong'
 
-asyncio.run(main())
-
-# if __name__ == '__main__':
-#     arg_parser = argparse.ArgumentParser(description='Register your game of interest')
+@login_manager.user_loader
+def load_user(user_id: str):
     
-#     arg_parser.add_argument('search_title', type=str, help='The full name of the title to search for.')
-#     arg_parser.add_argument('--page_num', type=int, default=10, help='The number of elements to check at once.')
-#     arg_parser.add_argument('--offset', type=int, default=0, help='The number of elements to ignore. Use this only when to search repeatedly.')
-
-#     args = arg_parser.parse_args()
-
-#     asyncio.run(resolve_game_entry(args.search_title, args.page_num, args.offset))
-
-
