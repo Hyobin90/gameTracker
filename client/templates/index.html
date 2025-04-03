@@ -15,7 +15,7 @@
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@3">
 
-<link href="../assets/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="../static/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
       .bd-placeholder-img {
@@ -176,7 +176,18 @@
       <p class="lead my-1">Track your games of interest.</p>
     </div>
     <div class="d-flex justify-content-end align-items-center">
-      <a class="btn btn-outline-primary btn-lg" href="#">Sign up</a>
+      <p class="lead mb-2">
+        {% if user_email != null %} 
+        {{ user_email }} 이메일 주소로 구독중입니다.&nbsp;
+        <a class="btn btn-light" href="/blog/logout" role="button">구독취소</a>
+        {% else %}
+        <form action="/blog/sign_up" method="post" class="d-flex align-items-center">
+            <input type="email" class="form-control" name="user_email" placeholder="Email">
+            <input type="password" class="form-control" name="password" placeholder="Password">
+            <a class="btn btn-outline-primary btn-lg" href="/blog/sign_up">Sign up</a>
+        </form>
+        {% endif %}
+      </p>
     </div>
     </div>
   </header>
