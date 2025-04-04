@@ -11,7 +11,7 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 # Flask Server instance
 app = Flask(__name__, static_url_path='/static', static_folder='client/static', template_folder='client/templates')
 CORS(app) # For Cross Origin Resource Sharing
-app.secret_key = 'test_key' # TODO Temporarily, a fixed key is used to keep the sessions, testing purpose
+app.secret_key = 'test_key2' # TODO Temporarily, a fixed key is used to keep the sessions, testing purpose
 
 # Blutprint
 app.register_blueprint(blog.blog, url_prefix='/blog')
@@ -20,6 +20,7 @@ app.register_blueprint(blog.blog, url_prefix='/blog')
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.session_protection = 'strong'
+
 
 # A hook to return an instance of User class, using the user_id included in the session information
 @login_manager.user_loader
