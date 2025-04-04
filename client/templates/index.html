@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en" data-bs-theme="auto">
-  <head><script src="../assets/js/color-modes.js"></script>
+  <head><script src="../static/js/color-modes.js"></script>
 
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,7 +15,7 @@
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@3">
 
-<link href="../assets/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="../static/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
       .bd-placeholder-img {
@@ -99,8 +99,6 @@
     
     <!-- Custom styles for this template -->
     <link href="https://fonts.googleapis.com/css?family=Playfair&#43;Display:700,900&amp;display=swap" rel="stylesheet">
-    <!-- Custom styles for this template -->
-    <link href="blog.css" rel="stylesheet">
   </head>
   <body>
     <svg xmlns="http://www.w3.org/2000/svg" class="d-none">
@@ -176,7 +174,27 @@
       <p class="lead my-1">Track your games of interest.</p>
     </div>
     <div class="d-flex justify-content-end align-items-center">
-      <a class="btn btn-outline-primary btn-lg" href="#">Sign up</a>
+      <p class="lead mb-2">
+        {% if user_email != null %} 
+        Logged in as {{ user_email }}.&nbsp;
+        <div>
+          <a class="btn btn-light" href="/blog/log_out" role="button">Log Out</a>
+          <a class="btn btn-light" href="/blog/delete_account">Delete Account</a>
+        </div>
+        {% else %}
+        {% if error %}
+          <div class="alert alert-danger">
+            {{ error }}
+          </div>
+        {% endif %}
+        <form action="/blog/sign_up" method="post" class="d-flex align-items-center">
+            <input type="email" class="form-control" name="user_email" placeholder="Email" required>
+            <input type="password" class="form-control" name="password" placeholder="Password" required>
+            <button type="submit" formaction="/blog/log_in" class="btn btn-outline-primary btn-lg">LogIn</button>
+            <button type="submit" formaction="/blog/sign_up" class="btn btn-outline-primary btn-lg">SignUp</button>
+        </form>
+        {% endif %}
+      </p>
     </div>
     </div>
   </header>
@@ -222,7 +240,7 @@
     <a href="#">Back to top</a>
   </p>
 </footer>
-<script src="../assets/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../static/dist/js/bootstrap.bundle.min.js"></script>
 
     </body>
 </html>
