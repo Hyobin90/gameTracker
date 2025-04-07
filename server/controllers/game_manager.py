@@ -1,6 +1,6 @@
 """Manage games by registering, and updating them."""
 from datetime import datetime
-from server.models.db_manager import query_db_with_pool, IntegrityError
+from server.models.mysqldb import query_db_with_pool, IntegrityError
 from server.models.game import Game
 import httpx
 from tabulate import tabulate # temp mesure for user interaction
@@ -11,21 +11,22 @@ import json
 URL_METACRITIC = 'https://www.metacritic.com/game/'
 URL_OPENCRITIC = 'https://opencritic.com/game/'
 date_pattern = r'^\d{4}-\d{2}-\d{2}$'
-property_json_path = os.path.join(os.getcwd(), 'DB', 'wikidata_properties.json')
+property_json_path = os.path.join(os.getcwd(), 'server', 'schemas', 'wikidata_properties.json')
 
 
 class GameManager:
     """A manager class that process data from game_db or Wikidata to create Game instances"""
-    def __init__(self):
+    def __init__(self, pool):
+        self.pool = pool
         self.properties = self._load_json_for_properties(property_json_path)
 
 
-    async def resolve_game_entry(self, search_title: str, db_connection_pool, for_prep: bool = False, search_page_num: int = 10, search_offset: int = 0) -> Optional[Game]:
+    async def resolve_game_entry(self, search_title: str, for_prep: bool = False, search_page_num: int = 10, search_offset: int = 0, debug=False) -> Optional[Game]:
         """Creates an instance of `Game` class when it's found in game_db or Wikidata.
         
         Args:
             search_title: the user's input for the game title to search for.
-            db_connection_pool: the pool of Connection to use to connect to DB. This will only used by the methods requiring `game_db`.
+            for_prep: a flag to indicate that this method is called for filling the game_db.
             search_page_num: the number of pages to look into at once when searching Wikidata.
             search_offset: the number of pages to ignore to retrieve the next batch of pages when searching Wikidata.
         
@@ -36,11 +37,12 @@ class GameManager:
             candidates_from_game_db = None
             # Check in game_db
             if not for_prep:
-                response = await self.search_game_db(search_title, db_connection_pool)
+                response = await self.search_game_db(search_title)
                 candidates_from_game_db = self._make_candiate_list_game_db(response)
 
             if candidates_from_game_db:
-                selected_candidates = self._display_game_candidates(search_keyword=search_title, game_candidates=candidates_from_game_db, data_source='game_db', for_prep=for_prep)
+                if debug:
+                    selected_candidates = self._display_game_candidates(search_keyword=search_title, game_candidates=candidates_from_game_db, data_source='game_db', for_prep=for_prep)
                 if selected_candidates:
                     print('The game has been found in game_db\n-------------------------------')
                     # TODO GTPS-49 have it return the data from game_table and date_platform_table no in Game
@@ -54,9 +56,10 @@ class GameManager:
             candidates_from_wikidata = self._make_candidate_list_wikidata(wikidata_codes)
 
             if candidates_from_wikidata:
-                selected_candidates = self._display_game_candidates(search_keyword=search_title, game_candidates=candidates_from_wikidata, data_source='wikidata', for_prep=for_prep)
+                if debug:
+                    selected_candidates = self._display_game_candidates(search_keyword=search_title, game_candidates=candidates_from_wikidata, data_source='wikidata', for_prep=for_prep)
                 if selected_candidates:
-                    await self.add_new_game(db_connection_pool, new_games=selected_candidates, for_prep=for_prep)
+                    await self.add_new_game(new_games=selected_candidates, for_prep=for_prep)
                     # TODO GTPS-49 have it return the data from game_table and date_platform_table no in Game
                     # TODO GTPS-49 have it return the new game data right away(game_table, date_platform_table)
                     # TODO change required for the client
@@ -72,7 +75,7 @@ class GameManager:
             raise RuntimeError(f'Error occurred in `resolve_game_entry()`: {e}') from e
 
 
-    async def search_game_db(self, search_title, db_connection_pool) -> Any:
+    async def search_game_db(self, search_title) -> Any:
         """Searches game_db for a game"""
         select_query = """
                         SELECT *, MATCH(title, aliases) AGAINST(%s) AS relevance
@@ -80,8 +83,8 @@ class GameManager:
                         WHERE MATCH(title, aliases) AGAINST(%s IN NATURAL LANGUAGE MODE)
                         HAVING relevance > 5.0;"""
         select_values = (search_title, search_title)
-        await query_db_with_pool(db_connection_pool, 'USE', 'USE game_db;')
-        response = await query_db_with_pool(db_connection_pool, 'SELECT', select_query, select_values)
+        await query_db_with_pool(self.pool, 'USE', 'USE game_db;')
+        response = await query_db_with_pool(self.pool, 'SELECT', select_query, select_values)
         return response
 
 
@@ -175,11 +178,10 @@ class GameManager:
         return game_candiates
 
 
-    async def add_new_game(self, db_connection_pool, new_games: Dict[str, str], for_prep: bool = False) -> Game:
+    async def add_new_game(self, new_games: Dict[str, str], for_prep: bool = False) -> Game:
         """Adds a new game into `game_db` and return it as Game.
         
         Args:
-            db_connection_pool: the pool of Connection to use to connect to DB.
             new_game: a dictionary of a new game to be added into game_db.
             for_prep: a flag to indicate whther it's for filling up game_db.
 
@@ -218,7 +220,7 @@ class GameManager:
                 dates_and_platforms = processed_metadata.get('publication_dates', None)
 
                 if not for_prep and is_DLC:
-                    response = await self.search_game_db(title, db_connection_pool)
+                    response = await self.search_game_db(title)
                     parent_cadiates_from_game_db = self._make_candiate_list_game_db(response)
                     selected_parent = self._display_game_candidates(parent_cadiates_from_game_db, 'game_db', is_DLC)
                     if not selected_parent:
@@ -237,10 +239,10 @@ class GameManager:
                 VALUES(%s, %s, %s, %s, %s, %s, %s, %s);
                 """
                 value_insert_game = (title, is_DLC, aliases, wikidata_code, genres, developers, publishers, parent_id)
-                await query_db_with_pool(db_connection_pool, 'INSERT', query_insert_game, value_insert_game)
+                await query_db_with_pool(self.pool, 'INSERT', query_insert_game, value_insert_game)
 
                 # Sends query to retrieve `game_id`
-                game_id_response = await query_db_with_pool(db_connection_pool, 'SELECT', 'SELECT LAST_INSERT_ID() AS game_id;')
+                game_id_response = await query_db_with_pool(self.pool, 'SELECT', 'SELECT LAST_INSERT_ID() AS game_id;')
                 game_id = game_id_response[0].get('game_id', None)
 
                 # Sends query to `release table` to add release data platforms and etc.
@@ -265,15 +267,15 @@ class GameManager:
                         platforms = element.get('platforms', None)
                         rel_date_str = datetime.strftime(release_date, "%Y-%m-%d") if release_date is not None else None
                         value_insert_data += (game_id, rel_date_str, released, platforms)
-                    await query_db_with_pool(db_connection_pool, 'INSERT', query_insert_data, value_insert_data)
+                    await query_db_with_pool(self.pool, 'INSERT', query_insert_data, value_insert_data)
                 elif not for_prep and not dates_and_platforms and is_DLC:
                     query_insert_data = complete_query(base_query, 1)
-                    parent_platforms = await query_db_with_pool(db_connection_pool, 'SELECT', f'SELECT platforms FROM date_platform_table WHERE game_id = {parent_id} GROUP BY platforms')
+                    parent_platforms = await query_db_with_pool(self.pool, 'SELECT', f'SELECT platforms FROM date_platform_table WHERE game_id = {parent_id} GROUP BY platforms')
                     platforms = ''
                     for element in parent_platforms:
                         platforms = platforms+ ', ' + element['platforms'] if platforms else element['platforms']
                     value_insert_data = (game_id, '2100-12-31', 0, platforms)
-                    await query_db_with_pool(db_connection_pool, 'INSERT', query_insert_data, value_insert_data)
+                    await query_db_with_pool(self.pool, 'INSERT', query_insert_data, value_insert_data)
 
                 print(f'{title} has been added into `game_db`.\n ---------------------------------------------')
 

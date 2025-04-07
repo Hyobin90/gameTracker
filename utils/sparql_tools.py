@@ -1,5 +1,5 @@
 """Scripts that holds methods using SPARQL for Wikidata"""
-from server.models.db_manager import query_wikidata
+from server.models.mysqldb import query_wikidata
 from typing import Any, Dict, List
 
 async def search_wikidata(search_title, search_page_num, search_offset) -> Any:

@@ -217,7 +217,10 @@
 
 <main class="container">
   <div id="tab-search">
-    <input type="search" class="form-control form-control-dark text-bg-dark" placeholder="Search..." aria-label="Search">
+    <form action="/blog/search" method="post" class="d-flex align-items-center">
+      <input type="search" class="form-control form-control-dark text-bg-dark" placeholder="Search..." aria-label="Search">
+      <button type="submit" class="btn btn-outline-primary btn-lg">Search</button>
+    </form>
   </div>
   <div id="tab-tracker" class="d-none">
     <div class="row mb-3 text-center">

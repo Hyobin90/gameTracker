@@ -2,6 +2,7 @@ import bcrypt
 import datetime
 from flask import Blueprint, request, render_template, redirect, url_for
 from flask_login import current_user, login_user, logout_user
+from instances import game_manager
 from server.controllers.user_manager import User
 from server.models.mongodb import connect_mongodb
 
@@ -15,6 +16,7 @@ def load_main_page():
     else:
         return render_template('index.html')
 
+# User Manangement
 
 @blog.route('/sign_up', methods=['GET', 'POST'])
 def sign_up():
@@ -69,3 +71,15 @@ def delete_account():
     User.delete(current_user.user_id)
     logout_user()
     return redirect(url_for('.load_main_page'))
+
+# Game Search
+
+@blog.route('/search', methods=['GET', 'POST'])
+def search_for_games():
+    """Searchs for the target game with the given keywords."""
+    if request.method == 'POST':
+        search_keyword = request.form.get('search_keyword')
+        print(search_keyword)
+        # TODO implement event_loop
+        game = game_manager.resolve_game_entry(search_title=search_keyword)
+        return 'working'

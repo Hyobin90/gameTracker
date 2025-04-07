@@ -1,9 +1,9 @@
 """ Entry point of the app """
 import asyncio
 import argparse
-from server.models.db_manager import create_db, init_pool, local_db_host, local_db_passwd, local_db_port, local_db_user, game_db_schema_path, query_db_with_pool
+from server.models.mysqldb import create_db, init_pool, local_db_host, local_db_passwd, local_db_port, local_db_user, game_db_schema_path, query_db_with_pool
 import os
-from server.controller.game_manager import GameManager
+from server.controllers.game_manager import GameManager
 
 
 async def main():
