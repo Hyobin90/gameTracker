@@ -22,45 +22,29 @@ class GameManager:
         self.properties = self._load_json_for_properties(property_json_path)
 
 
-    async def search_game_db(self, search_title: str):
-        """Searches game_db for the target game.
+    async def find_candiates(self, search_title: str):
+        """Provides a list of candiates by searching game_db or Wikidata.
         
         Args:
             search_title: the user's input for the game title to search for.
         """
         try:
-            candiates_form_game_db = None
+            candiates = None
 
             response = await self._search_game_db(search_title)
-            candiates_form_game_db = self._make_candiate_list_game_db(response)
+            candiates = self._make_candiate_list_game_db(response)
 
-            return candiates_form_game_db
+            if not candiates:
+                entity_codes = self._search_wikidata(search_title)
+                candiates = self._make_candidate_list_wikidata(entity_codes)
 
-        except IntegrityError as e:
-            raise IntegrityError(f'IntegrityError has occurred. | {e.__cause__}') from e
-        except Exception as e:
-            raise RuntimeError(f'Error occurred in `search_game_db()`: {e}') from e
-
-
-    async def search_wikidata(self, search_title: str):
-        """Searches Wikidata for the target game.
-        
-        Args:
-            search_title: the user's input for the game title to search for.
-        """
-        try:
-            candiates_form_game_db = None
-
-            response = self._search_wikidata(search_title)
-            candiates_form_game_db = self._make_candidate_list_wikidata(response)
-
-            return candiates_form_game_db
+            return candiates
 
         except IntegrityError as e:
             raise IntegrityError(f'IntegrityError has occurred. | {e.__cause__}') from e
         except Exception as e:
-            raise RuntimeError(f'Error occurred in `search_wikidata()`: {e}') from e
-        
+            raise RuntimeError(f'Error occurred in `find_candiates()`: {e}') from e
+
 
     async def _search_game_db(self, search_title) -> Any:
         """Searches game_db for a game"""
@@ -122,10 +106,13 @@ class GameManager:
             'list': 'search',
             'srsearch': search_title,
             'srnamespace': 0,
+            'srlimit': 50,
             'format': 'json',
             'props': 'claims'
         }
 
+        # TODO narrow it down to video games if possible
+        # TODO Increment the number of element inlcuded in the response 
         response = httpx.get(url=url, params=params)
         response.raise_for_status()
         data = response.json()

@@ -32511,6 +32511,10 @@
             "label": "Microsoft Windows"
         },
         {
+          "code": "Q21207",
+          "label": "Windows Mobile"
+        },
+        {
             "code": "Q14116",
             "label": "macOS"
         },
@@ -32525,6 +32529,10 @@
         {
           "code": "Q188642",
           "label": "Game Boy Advance"
+        },
+        {
+          "code": "Q8079",
+          "label": "Wii"
         },
         {
           "code": "Q56942",

@@ -80,9 +80,6 @@ def search_for_games():
     search_keyword = request.args.get('search_keyword')
 
     candidates = None
-    candidates = game_manager.loop.run_until_complete(game_manager.search_game_db(search_keyword))
-    if not candidates:
-        candidates = game_manager.loop.run_until_complete(game_manager.search_wikidata(search_keyword))
+    candidates = game_manager.loop.run_until_complete(game_manager.find_candiates(search_keyword))
 
     return jsonify(candidates)
-
