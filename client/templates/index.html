@@ -225,6 +225,9 @@
           <th>Title</th>
           <th>Platforms</th>
           <th>Release Date</th>
+          <th>Genres</th>
+          <th>Developers</th>
+          <th>wikidata</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -260,6 +263,9 @@
               <td>${game.title}</td>
               <td>${game.platforms}</td>
               <td>${game.release_date}</td>
+              <td>${game.genres}</td>
+              <td>${game.developers}</td>
+              <td><a href="https://wikidata.org/wiki/${game.wikidata_code}">LINK</a></td>
             `;
 
             tableBody.appendChild(row);
