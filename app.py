@@ -1,9 +1,10 @@
-from server.views import blog
 from flask import Flask, jsonify, request, render_template, make_response, session
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from flask_cors import CORS
 import os
 from server.controllers.user_manager import User
+
+from server.views import blog
 
 # A configuration for allowing testing features in `HTTP` that are only available for `HTTPS`
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'

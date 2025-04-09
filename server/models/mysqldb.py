@@ -12,7 +12,7 @@ local_db_host = 'localhost'
 local_db_port = int(os.getenv('LOCAL_SQL_DB_PORT'))
 local_db_user = os.getenv('LOCAL_SQL_DB_USER')
 local_db_passwd = os.getenv('LOCAL_SQL_PASSWD')
-game_db_schema_path = os.path.join(os.getcwd(), 'DB', 'game_db_schema.sql')
+game_db_schema_path = os.path.join(os.getcwd(), 'server', 'schemas', 'game_db_schema.sql')
 
 # for Wikidata
 WIKIDATA_SPARQL_URL = "https://query.wikidata.org/sparql"
@@ -45,9 +45,16 @@ async def create_db(host: str, port: int, user: str, passwd: str, db_name: str, 
         raise Exception(f'Error occurred in `create_db()`: {e}') from e
 
 
-async def init_pool(host: str, port: int, user: str, passwd: str, db_name: str):
+async def init_pool(host: str, port: int, user: str, passwd: str):
     """Initializes the pool of Connection."""
     pool = await create_pool(host=host, port=port, user=user, password=passwd)
+    return pool
+
+
+async def init_db(host: str, port: int, user: str, passwd: str, db_name: str, schema_path: str):
+    """Calls `create_db` and `init_pool` in succession."""
+    await create_db(host, port, user, passwd, db_name, schema_path)
+    pool = await init_pool(host, port, user, passwd)
     return pool
 
 
