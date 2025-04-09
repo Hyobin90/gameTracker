@@ -217,10 +217,18 @@
 
 <main class="container">
   <div id="tab-search">
-    <form action="/blog/search" method="post" class="d-flex align-items-center">
-      <input type="search" class="form-control form-control-dark text-bg-dark" placeholder="Search..." aria-label="Search">
-      <button type="submit" class="btn btn-outline-primary btn-lg">Search</button>
-    </form>
+    <input type="text" class="form-control form-control-dark text-bg-dark" id="search_keyword" name="search_keyword" placeholder="Search..." aria-label="Search" required>
+    <button onclick="searchGame()" class="btn btn-outline-primary btn-lg">Search</button>
+    <table id="game-table" class="table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Platforms</th>
+          <th>Release Date</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
   <div id="tab-tracker" class="d-none">
     <div class="row mb-3 text-center">
@@ -233,6 +241,33 @@
     function changeTab(name) {
       document.getElementById('tab-search').classList.toggle('d-none', name !== 'search');
       document.getElementById('tab-tracker').classList.toggle('d-none', name !== 'tracker');
+    }
+
+    function searchGame() {
+      const searchKeyword = document.getElementById('search_keyword').value;
+      const url = `/blog/search?search_keyword=${encodeURIComponent(searchKeyword)}`;
+      
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          const tableBody = document.querySelector('#game-table tbody');
+          tableBody.innerHTML = '';
+
+          data.forEach(game => {
+            const row = document.createElement('tr');
+
+            row.innerHTML = `
+              <td>${game.title}</td>
+              <td>${game.platforms}</td>
+              <td>${game.release_date}</td>
+            `;
+
+            tableBody.appendChild(row);
+          });
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+        })
     }
   </script>
 </main>

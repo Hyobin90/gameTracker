@@ -16,70 +16,59 @@ property_json_path = os.path.join(os.getcwd(), 'server', 'schemas', 'wikidata_pr
 
 class GameManager:
     """A manager class that process data from game_db or Wikidata to create Game instances"""
-    def __init__(self, pool):
+    def __init__(self, loop, pool):
+        self.loop = loop
         self.pool = pool
         self.properties = self._load_json_for_properties(property_json_path)
 
 
-    async def resolve_game_entry(self, search_title: str, for_prep: bool = False, search_page_num: int = 10, search_offset: int = 0, debug=False) -> Optional[Game]:
-        """Creates an instance of `Game` class when it's found in game_db or Wikidata.
+    async def search_game_db(self, search_title: str):
+        """Searches game_db for the target game.
         
         Args:
             search_title: the user's input for the game title to search for.
-            for_prep: a flag to indicate that this method is called for filling the game_db.
-            search_page_num: the number of pages to look into at once when searching Wikidata.
-            search_offset: the number of pages to ignore to retrieve the next batch of pages when searching Wikidata.
-        
-        Returns:
-            an instance of Game containing the data of the target game if found.
         """
         try:
-            candidates_from_game_db = None
-            # Check in game_db
-            if not for_prep:
-                response = await self.search_game_db(search_title)
-                candidates_from_game_db = self._make_candiate_list_game_db(response)
+            candiates_form_game_db = None
 
-            if candidates_from_game_db:
-                if debug:
-                    selected_candidates = self._display_game_candidates(search_keyword=search_title, game_candidates=candidates_from_game_db, data_source='game_db', for_prep=for_prep)
-                if selected_candidates:
-                    print('The game has been found in game_db\n-------------------------------')
-                    # TODO GTPS-49 have it return the data from game_table and date_platform_table no in Game
-                    # TODO change required for the client
-                    for selected_candidate in selected_candidates:
-                        return Game(selected_candidate)
+            response = await self._search_game_db(search_title)
+            candiates_form_game_db = self._make_candiate_list_game_db(response)
 
-            # Fall back to Wikidata
-            print(f'The game, {search_title} was not found in game_db, trying in Wikidata')
-            wikidata_codes = self.search_wikidata_for_game(search_title)
-            candidates_from_wikidata = self._make_candidate_list_wikidata(wikidata_codes)
+            return candiates_form_game_db
 
-            if candidates_from_wikidata:
-                if debug:
-                    selected_candidates = self._display_game_candidates(search_keyword=search_title, game_candidates=candidates_from_wikidata, data_source='wikidata', for_prep=for_prep)
-                if selected_candidates:
-                    await self.add_new_game(new_games=selected_candidates, for_prep=for_prep)
-                    # TODO GTPS-49 have it return the data from game_table and date_platform_table no in Game
-                    # TODO GTPS-49 have it return the new game data right away(game_table, date_platform_table)
-                    # TODO change required for the client
-                    for selected_candidate in selected_candidates:
-                        return Game(selected_candidate)
-
-            print(f'The game, {search_title} was not even found in Wikidata. Please try again with another name.')
-            return None
-        
         except IntegrityError as e:
             raise IntegrityError(f'IntegrityError has occurred. | {e.__cause__}') from e
         except Exception as e:
-            raise RuntimeError(f'Error occurred in `resolve_game_entry()`: {e}') from e
+            raise RuntimeError(f'Error occurred in `search_game_db()`: {e}') from e
 
 
-    async def search_game_db(self, search_title) -> Any:
+    async def search_wikidata(self, search_title: str):
+        """Searches Wikidata for the target game.
+        
+        Args:
+            search_title: the user's input for the game title to search for.
+        """
+        try:
+            candiates_form_game_db = None
+
+            response = self._search_wikidata(search_title)
+            candiates_form_game_db = self._make_candidate_list_wikidata(response)
+
+            return candiates_form_game_db
+
+        except IntegrityError as e:
+            raise IntegrityError(f'IntegrityError has occurred. | {e.__cause__}') from e
+        except Exception as e:
+            raise RuntimeError(f'Error occurred in `search_wikidata()`: {e}') from e
+        
+
+    async def _search_game_db(self, search_title) -> Any:
         """Searches game_db for a game"""
         select_query = """
                         SELECT *, MATCH(title, aliases) AGAINST(%s) AS relevance
                         FROM game_table 
+                        INNER JOIN date_platform_table
+                        on game_table.game_id = date_platform_table.game_id
                         WHERE MATCH(title, aliases) AGAINST(%s IN NATURAL LANGUAGE MODE)
                         HAVING relevance > 5.0;"""
         select_values = (search_title, search_title)
@@ -89,7 +78,7 @@ class GameManager:
 
 
     def _make_candiate_list_game_db(self, response) -> List[Dict[str, str]]:
-        """Makes a list of found games as candidates from game_db for the user to choose as a target game.
+        """Makes a list of games found in game_db with their metadata.
 
         Args:
             sql_response : The response of SQL query containing games from game_db.
@@ -117,13 +106,15 @@ class GameManager:
                 'genres': element.get('genres', None),
                 'developers': element.get('developers', None),
                 'publishers': element.get('publishers', None),
+                'release_date': element.get('release_date', None).strftime('%Y-%m-%d'),
+                'platforms': element.get('date_platform_table.platforms', None)
                 }
             game_candiates.append(candidate)
 
         return game_candiates
 
 
-    def search_wikidata_for_game(self, search_title: str) -> List[str]:
+    def _search_wikidata(self, search_title: str) -> List[str]:
         """Searches Wikidata to get the entity codes of entities that match the search title."""
         url = 'https://www.wikidata.org/w/api.php'
         params = {
@@ -178,7 +169,7 @@ class GameManager:
         return game_candiates
 
 
-    async def add_new_game(self, new_games: Dict[str, str], for_prep: bool = False) -> Game:
+    async def _add_new_game(self, new_games: Dict[str, str], for_prep: bool = False) -> Game:
         """Adds a new game into `game_db` and return it as Game.
         
         Args:
@@ -220,7 +211,7 @@ class GameManager:
                 dates_and_platforms = processed_metadata.get('publication_dates', None)
 
                 if not for_prep and is_DLC:
-                    response = await self.search_game_db(title)
+                    response = await self._search_game_db(title)
                     parent_cadiates_from_game_db = self._make_candiate_list_game_db(response)
                     selected_parent = self._display_game_candidates(parent_cadiates_from_game_db, 'game_db', is_DLC)
                     if not selected_parent:
@@ -283,7 +274,7 @@ class GameManager:
             # TODO cutsom debug log
             print(f'IntegrityError has occurred : {title} is already present in game_db')
         except Exception as e:
-            raise RuntimeError(f'Error occurred in `add_new_game()` | {e}') from e
+            raise RuntimeError(f'Error occurred in `_add_new_game()` | {e}') from e
 
 
     def get_metadata(self, code: str, language: str = 'en', filtering_platforms: List[str] = []) -> Dict:
@@ -468,3 +459,52 @@ class GameManager:
             elif 1 <= choice <= len(temp):
                 print(f'You selected {temp[choice-1]["title"]}')
                 return [game_candidates[choice-1]]
+            
+
+
+    # TODO only for debug or internal use
+
+    async def resolve_game_entry(self, search_title: str, for_prep: bool = False, search_page_num: int = 10, search_offset: int = 0) -> Optional[Game]:
+        """Creates an instance of `Game` class when it's found in game_db or Wikidata.
+        
+        Args:
+            search_title: the user's input for the game title to search for.
+            for_prep: a flag to indicate that this method is called for filling the game_db.
+            search_page_num: the number of pages to look into at once when searching Wikidata.
+            search_offset: the number of pages to ignore to retrieve the next batch of pages when searching Wikidata.
+        
+        Returns:
+            an instance of Game containing the data of the target game if found.
+        """
+        try:
+            candidates_from_game_db = None
+            # Check in game_db
+            if not for_prep:
+                response = await self._search_game_db(search_title)
+                candidates_from_game_db = self._make_candiate_list_game_db(response)
+
+            selected_candidate = None
+            if candidates_from_game_db:
+                selected_candidate = self._display_game_candidates(search_keyword=search_title, game_candidates=candidates_from_game_db, data_source='game_db', for_prep=for_prep)
+                if selected_candidate:
+                    print('The game has been found in game_db\n-------------------------------')
+                    return Game(selected_candidate)
+
+            # Fall back to Wikidata
+            print(f'The game, {search_title} was not found in game_db, trying in Wikidata')
+            wikidata_codes = self._search_wikidata(search_title)
+            candidates_from_wikidata = self._make_candidate_list_wikidata(wikidata_codes)
+
+            if candidates_from_wikidata:
+                selected_candidate = self._display_game_candidates(search_keyword=search_title, game_candidates=candidates_from_wikidata, data_source='wikidata', for_prep=for_prep)
+                if selected_candidate:
+                    await self._add_new_game(new_games=selected_candidate, for_prep=for_prep)
+                    return Game(selected_candidate)
+
+            print(f'The game, {search_title} was not even found in Wikidata. Please try again with another name.')
+            return None
+        
+        except IntegrityError as e:
+            raise IntegrityError(f'IntegrityError has occurred. | {e.__cause__}') from e
+        except Exception as e:
+            raise RuntimeError(f'Error occurred in `resolve_game_entry()`: {e}') from e

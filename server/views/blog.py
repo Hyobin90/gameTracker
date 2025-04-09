@@ -1,6 +1,6 @@
 import bcrypt
 import datetime
-from flask import Blueprint, request, render_template, redirect, url_for
+from flask import Blueprint, request, render_template, redirect, url_for, jsonify
 from flask_login import current_user, login_user, logout_user
 from instances import game_manager
 from server.controllers.user_manager import User
@@ -77,9 +77,12 @@ def delete_account():
 @blog.route('/search', methods=['GET', 'POST'])
 def search_for_games():
     """Searchs for the target game with the given keywords."""
-    if request.method == 'POST':
-        search_keyword = request.form.get('search_keyword')
-        print(search_keyword)
-        # TODO implement event_loop
-        game = game_manager.resolve_game_entry(search_title=search_keyword)
-        return 'working'
+    search_keyword = request.args.get('search_keyword')
+
+    candidates = None
+    candidates = game_manager.loop.run_until_complete(game_manager.search_game_db(search_keyword))
+    if not candidates:
+        candidates = game_manager.loop.run_until_complete(game_manager.search_wikidata(search_keyword))
+
+    return jsonify(candidates)
+

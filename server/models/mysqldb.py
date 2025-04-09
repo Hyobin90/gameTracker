@@ -53,8 +53,8 @@ async def init_pool(host: str, port: int, user: str, passwd: str):
 
 async def init_db(host: str, port: int, user: str, passwd: str, db_name: str, schema_path: str):
     """Calls `create_db` and `init_pool` in succession."""
-    create_db(host, port, user, passwd, db_name, schema_path)
-    pool = init_pool(host, port, user, passwd)
+    await create_db(host, port, user, passwd, db_name, schema_path)
+    pool = await init_pool(host, port, user, passwd)
     return pool
 
 

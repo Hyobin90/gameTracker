@@ -8,9 +8,11 @@ from server.controllers.game_manager import GameManager
 
 async def main():
     # Initialize `game_db`
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     await create_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
-    db_connection_pool = await init_pool(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db')
-    game_manager = GameManager()
+    db_connection_pool = await init_pool(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd)
+    game_manager = GameManager(pool=db_connection_pool, loop=loop)
     game = await game_manager.resolve_game_entry('Amplitude', db_connection_pool)
 
     # The last to step before closing the app
