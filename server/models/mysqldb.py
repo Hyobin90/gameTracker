@@ -17,7 +17,7 @@ game_db_schema_path = os.path.join(os.getcwd(), 'server', 'schemas', 'game_db_sc
 # for Wikidata
 WIKIDATA_SPARQL_URL = "https://query.wikidata.org/sparql"
 
-async def create_db(host: str, port: int, user: str, passwd: str, db_name: str, schema_path: str):
+async def create_mysql_db(host: str, port: int, user: str, passwd: str, db_name: str, schema_path: str):
     """Creates a database from a schema file.
     Args:
         schema_path: the path to .sql file containg the shcema.
@@ -38,11 +38,11 @@ async def create_db(host: str, port: int, user: str, passwd: str, db_name: str, 
         async with db_connection.cursor() as db_cursor:
             await db_cursor.execute(f'CREATE DATABASE {db_name}')
             await db_cursor.execute(f'USE {db_name}')
-            await create_db(local_db_host, local_db_port, local_db_user, local_db_passwd, 'game_db', game_db_schema_path)
+            await create_mysql_db(local_db_host, local_db_port, local_db_user, local_db_passwd, 'game_db', game_db_schema_path)
     except ProgrammingError as e:
         print(f'Error occurred while creating DB: {e}')
     except Exception as e:
-        raise Exception(f'Error occurred in `create_db()`: {e}') from e
+        raise Exception(f'Error occurred in `create_mysql_db()`: {e}') from e
 
 
 async def init_pool(host: str, port: int, user: str, passwd: str):
@@ -52,8 +52,8 @@ async def init_pool(host: str, port: int, user: str, passwd: str):
 
 
 async def init_db(host: str, port: int, user: str, passwd: str, db_name: str, schema_path: str):
-    """Calls `create_db` and `init_pool` in succession."""
-    await create_db(host, port, user, passwd, db_name, schema_path)
+    """Calls `create_mysql_db` and `init_pool` in succession."""
+    await create_mysql_db(host, port, user, passwd, db_name, schema_path)
     pool = await init_pool(host, port, user, passwd)
     return pool
 

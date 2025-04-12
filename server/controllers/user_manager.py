@@ -3,6 +3,7 @@ from bson.objectid import ObjectId
 from flask_login import UserMixin
 from server.models.mongodb import connect_mongodb
 
+
 class User(UserMixin):
     def __init__(self, user_id, user_email, game_list):
         self.user_id = user_id # `_id` genearted by MongoDB automatcially
@@ -92,3 +93,19 @@ class User(UserMixin):
         salt = bcrypt.gensalt()
 
         return bcrypt.hashpw(bytes, salt)
+
+
+    def add_game(self, target_game):
+        """Adds the target game into the user's game list.
+        
+        Args:
+            target_game: the game to add into the user's game list.
+        """
+        user_db = connect_mongodb('users')
+        user_collection = user_db.users
+
+        user_collection.update_one(
+            {'_id': ObjectId(self.user_id)},
+            {'$push': {'game_list': target_game.__dict__}}
+        )
+        self.game_list.append(target_game)

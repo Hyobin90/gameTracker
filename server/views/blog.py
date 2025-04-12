@@ -83,3 +83,26 @@ def search_for_games():
     candidates = game_manager.loop.run_until_complete(game_manager.find_candiates(search_keyword))
 
     return jsonify(candidates)
+
+
+@blog.route('/add_game')
+def add_game_into_game_list():
+    """Adds the given game into the user's game list while adding the game into game_db if it's not in game_db."""
+    # TODO Veirfy if the user is authenticated
+    if not current_user.is_authenticated:
+        return
+    
+    # TODO add the target game into the user's game list.
+    game_id = request.args.get('game_id')
+    release_id = request.args.get('release_id')
+    target_game = game_manager.loop.run_until_complete(game_manager.search_game_db_with_id(game_id, release_id))
+    # TODO add loop to the user?
+    current_user.add_game(target_game)
+
+    # TODO add the target game into game_db if it is not there.
+    # if game not in game_db:
+    # Use the wikidata code
+    #   game_manager.add_new_game()
+
+    # TODO what to show to the user after adding the game??
+    # return
