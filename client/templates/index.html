@@ -203,35 +203,54 @@
 <div>
   <nav>
       <div class="container pb-md-5 text-center">
-        <div class="row gx-5">
-          <div class="col d-grid">
-            <button type="button" class="btn btn-secondary w-100" onclick="changeTab('search')">Search</button>
+        {% if user_email != null %} 
+          <div class="row gx-5">
+            <div class="col d-grid">
+              <button type="button" class="btn btn-secondary w-100" onclick="changeTab('search')">Search</button>
+            </div>
+            <div class="col d-grid">
+              <button type="button" class="btn btn-secondary w-100" onclick="changeTab('tracker')">Games of Interest</button>
+            </div>
           </div>
-          <div class="col d-grid">
-            <button type="button" class="btn btn-secondary w-100" onclick="changeTab('tracker')">Games of Interest</button>
+        {% else %}
+          <div class="row gx-5">
+            <div class="col d-grid">
+              <button type="button" class="btn btn-secondary w-100" disabled>Search</button>
+            </div>
+            <div class="col d-grid">
+              <button type="button" class="btn btn-secondary w-100" disabled>Games of Interest</button>
+            </div>
           </div>
-        </div>
+        {% endif %}
       </div>
     </nav>
 </div>
 
 <main class="container">
   <div id="tab-search">
-    <input type="text" class="form-control form-control-dark text-bg-dark" id="search_keyword" name="search_keyword" placeholder="Search..." aria-label="Search" required>
-    <button onclick="searchGame()" class="btn btn-outline-primary btn-lg">Search</button>
-    <table id="game-table" class="table">
-      <thead>
-        <tr>
-          <th>Title</th>
-          <th>Platforms</th>
-          <th>Release Date</th>
-          <th>Genres</th>
-          <th>Developers</th>
-          <th>wikidata</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    {% if user_email != null %}
+      <form onsubmit="searchGame(event)">
+        <input type="text" class="form-control form-control-dark text-bg-dark" id="search_keyword" name="search_keyword" placeholder="Search..." aria-label="Search" required>
+        <button type="submit" class="btn btn-outline-primary btn-lg">Search</button>
+      </form>
+      <table id="game-table" class="table">
+        <thead>
+          <tr>
+            <th>Add</th>
+            <th>Title</th>
+            <th>Platforms</th>
+            <th>Release Date</th>
+            <th>Genres</th>
+            <th>Developers</th>
+            <th>wikidata</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    {% else %}
+      <input type="text" class="form-control form-control-dark text-bg-dark" id="search_keyword" name="search_keyword" placeholder="Please Log in" disabled>
+      <button type="submit" class="btn btn-outline-primary btn-lg" disabled>Search</button>
+    {% endif %}
   </div>
   <div id="tab-tracker" class="d-none">
     <div class="row mb-3 text-center">
@@ -241,18 +260,23 @@
     </div>
   </div>
   <script>
+    //let searchResult = [];
+
     function changeTab(name) {
       document.getElementById('tab-search').classList.toggle('d-none', name !== 'search');
       document.getElementById('tab-tracker').classList.toggle('d-none', name !== 'tracker');
     }
 
-    function searchGame() {
+    function searchGame(e) {
+      e.preventDefault();
       const searchKeyword = document.getElementById('search_keyword').value;
       const url = `/blog/search?search_keyword=${encodeURIComponent(searchKeyword)}`;
       
       fetch(url)
         .then(response => response.json())
         .then(data => {
+          //searchResult = data; // stores the search result in the global variable.
+
           const tableBody = document.querySelector('#game-table tbody');
           tableBody.innerHTML = '';
 
@@ -260,6 +284,7 @@
             const row = document.createElement('tr');
 
             row.innerHTML = `
+              <td><a href="/blog/add_game?game_id=${game.game_id}&release_id=${game.release_id}" class="btn btn-primary">ADD</td>
               <td>${game.title}</td>
               <td>${game.platforms}</td>
               <td>${game.release_date}</td>

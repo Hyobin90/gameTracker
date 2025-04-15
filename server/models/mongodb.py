@@ -24,3 +24,4 @@ def connect_mongodb(db_name: Literal['users', 'sessions']):
         return MONGO_CONNECTION.users
     elif db_name == 'sessions':
         return MONGO_CONNECTION.sessions
+    

@@ -1,7 +1,7 @@
 """ Entry point of the app """
 import asyncio
 import argparse
-from server.models.mysqldb import create_db, init_pool, local_db_host, local_db_passwd, local_db_port, local_db_user, game_db_schema_path, query_db_with_pool
+from server.models.mysqldb import create_mysql_db, init_pool, local_db_host, local_db_passwd, local_db_port, local_db_user, game_db_schema_path, query_db_with_pool
 import os
 from server.controllers.game_manager import GameManager
 
@@ -10,10 +10,10 @@ async def main():
     # Initialize `game_db`
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    await create_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
+    await create_mysql_db(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd, db_name='game_db', schema_path=game_db_schema_path)
     db_connection_pool = await init_pool(host=local_db_host, port=local_db_port, user=local_db_user, passwd=local_db_passwd)
     game_manager = GameManager(pool=db_connection_pool, loop=loop)
-    game = await game_manager.resolve_game_entry('Amplitude', db_connection_pool)
+    game = await game_manager.resolve_game_entry('khazan', db_connection_pool)
 
     # The last to step before closing the app
     db_connection_pool.close()

@@ -41,43 +41,47 @@ class Goals(Enum):
 
 class Game:
     """A class to hold metadata on a game"""
-    def __init__(self, title:str, wikidata =Dict[str, str]):
+    def __init__(self, title:str, game_id:str, aliases: str, wikidata_code: str, is_DLC: int, parent_id: str,
+                 genres: str, developers: str, publishers: str, release_id: str, release_date: datetime,
+                 released: int, platforms: str, **kwargs):
         # Necessary data on the game
         self.title = title
+        self.game_id = game_id
+        self.aliases = aliases.split(', ')
+        self.wikidata_code = wikidata_code
+        self.is_dlc = True if is_DLC else False
+        self.parent_id = parent_id
+        self.genres = genres.split(', ')
+        self.developers = developers.split(', ')
+        self.publishers = publishers.split(', ')
+        self.release_id = release_id
+        self.release_date = release_date.strftime('%Y-%m-%d')
+        self.released = True if released else False
+        self.platforms = platforms.split(', ')
+        # self.regions
 
-        # Data from the user
-        self.purchase_date = None # this is not stored in game_db
+        #self.my_score = 0
 
-        # Data from `Wikidata`
-        self.wikidata_code = ''
-        self.genres = ''
-        self.developers = ''
-        self.publishers = ''
-        self.release_date = None
-        self.released = None
-        self.platforms = ''
-        self.my_score = 0
+        # Data to be filled after playing
+        # self.goals = {}
+        # self.note = ''
+        # self.logo = None
 
-        # Data to be filled after playing # TODO maybe with NoSQL implemented
-        self.goals = {}
-        self.note = ''
-        self.logo = None # but from `Wikidata``
-
-        ## Data from `Metacritics`
-        self.meta_critics_score = 0
-        self.meta_user_score = 0
-        ## Data from `Opencritics`
-        self.open_critics_score = 0
-        self.open_user_score = 0
-
-        # Data from `PSN API`
-        self.pro_enhanced: bool = False
+        ## Data from `PSN API`
+        # self.pro_enhanced = pro_enhanced
+        # ## Data from `Metacritics`
+        # self.meta_critics_score = 0
+        # self.meta_user_score = 0
+        # ## Data from `Opencritics`
+        # self.open_critics_score = 0
+        # self.open_user_score = 0
 
         # Attributes to be updated per user, stored in their DB, not stored in game_db
-        self.purchased = None
-        self.playing = None
-        self.played = None
-        self.status: Status = None
+        # self.purchase_date = None # this is not stored in game_db
+        # self.purchased = None
+        # self.playing = None
+        # self.played = None
+        # self.status: Status = None
 
 
     def update_status(self) -> None:
@@ -110,8 +114,6 @@ class Game:
             print(f'Error occurred while updating Game status : {e}')
     
 
-
-
     def set_game_active(self) ->  None:
         """Set the game currently playing."""
         if self.purchased:
@@ -127,6 +129,7 @@ class Game:
             self.update_status()
 
 
+    # TODO maybe not needed
     def _fill_metadata_from_wikidata(self, wikidata:Dict[str, str]):
         """Fills up the metadata from `Wikidata` """
         try:
