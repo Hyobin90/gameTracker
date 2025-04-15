@@ -26421,6 +26421,10 @@
       ],
     "publishers": [
         {
+          "code": "Q562078",
+          "label": "Nexon"
+        },
+        {
           "code": "Q109342583",
           "label": "Game Science"
         },

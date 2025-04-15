@@ -105,7 +105,7 @@ class User(UserMixin):
         user_collection = user_db.users
 
         user_collection.update_one(
-            {'_id': ObjectId(self.user_id)},
-            {'$push': {'game_list': target_game.__dict__}}
+            {'_id': self.user_id},
+            {'$addToSet': {'game_list': target_game.__dict__}}
         )
         self.game_list.append(target_game)

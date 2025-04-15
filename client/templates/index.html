@@ -260,6 +260,8 @@
     </div>
   </div>
   <script>
+    //let searchResult = [];
+
     function changeTab(name) {
       document.getElementById('tab-search').classList.toggle('d-none', name !== 'search');
       document.getElementById('tab-tracker').classList.toggle('d-none', name !== 'tracker');
@@ -273,6 +275,8 @@
       fetch(url)
         .then(response => response.json())
         .then(data => {
+          //searchResult = data; // stores the search result in the global variable.
+
           const tableBody = document.querySelector('#game-table tbody');
           tableBody.innerHTML = '';
 
