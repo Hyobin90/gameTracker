@@ -173,10 +173,9 @@ class Game:
             return (self.release_date - current_date).days
         
 
-
+    # TODO this should be called by the client
     def set_purchase(self) -> None:
         """Sets the purchase date and purchase related status."""
-        # TODO this should be called by the client
         # TODO this can be called when the game is purchased before or after released.
         while True:
             purchase_date = input('Please put the date of purchase in the following format, yyyy-mm-dd.\nPlease enter 0, if you haven\'t purchased the game yet.\n')
@@ -191,7 +190,6 @@ class Game:
                 print(f'Wrong date format: {purchase_date}')
                 continue
         self.update_status()
-
 
 
     # TODO this should be called by the client
@@ -232,7 +230,6 @@ class Game:
         # self.my_score = 0
 
 
-    # TODO this should be called by the client
     def fill_meta_score(self):
         """Retrieve critics score and user score from `Metacritic`"""
         pass
@@ -241,7 +238,6 @@ class Game:
         # self.meta_user_score = 0
 
 
-    # TODO this should be called by the client
     def fill_open_score(self):
         """Retrieve critics score and user score from `Opencritic`"""
         pass
