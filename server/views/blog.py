@@ -91,6 +91,7 @@ def add_game_into_game_list():
     if not current_user.is_authenticated:
         return
     
+    # Retrieve the game itself not only the game_id and release_id
     game_id = request.args.get('game_id')
     release_id = request.args.get('release_id')
 
