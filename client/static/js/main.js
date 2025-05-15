@@ -103,7 +103,6 @@ async function setUserGameData(game) {
     game['playing_platform'] = await setPlayingPlatform();
     game['expectation_level'] = await setExpectionLevel();
 
-
     fetch('/blog/add_game', {
         method: 'POST',
         headers: {
@@ -111,12 +110,15 @@ async function setUserGameData(game) {
         },
         body: JSON.stringify(game)
     })
-    .then(response => response.json())
     .then(() => {
-        console.log('done');
+        const askingSection = document.getElementById('askingSection');
+        askingSection.remove();
+        const tableBody = document.querySelector('#game-table tbody');
+        tableBody.innerHTML = '';
     })
     .catch(error => {
         console.error('Error fetching data:', error);
+        // Display the error to the user?
     })
 }
 

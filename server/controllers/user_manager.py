@@ -106,6 +106,6 @@ class User(UserMixin):
 
         user_collection.update_one(
             {'_id': self.user_id},
-            {'$addToSet': {'game_list': target_game.__dict__}}
+            {'$addToSet': {'game_list': target_game}}
         )
         self.game_list.append(target_game)
