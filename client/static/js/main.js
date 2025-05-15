@@ -14,12 +14,29 @@ async function searchGame(e) {
     fetch(url)
     .then(response => response.json())
     .then(data => {
-        //searchResult = data; // stores the search result in the global variable.
+        searchResult = data; // stores the search result in the global variable.
 
         const tableBody = document.querySelector('#game-table tbody');
         tableBody.innerHTML = '';
 
-        data.forEach(game => {
+        createTable(data);
+    })
+    .catch(error => {
+        console.error('Error fetching data:', error);
+    })
+}
+// the transition screen should be called 
+// /blog/add_game route should be called in the transition screen
+// the transition screen has multiple layers -> multiple functions
+// store the data selected by the user in the memory
+// Send the data to a route
+// create a route in the backend
+
+function createTable(data) {
+    const tableBody = document.querySelector('#game-table tbody');
+    tableBody.innerHTML = '';
+
+    data.forEach(game => {
         const row = document.createElement('tr');
         
         row.innerHTML = `
@@ -48,89 +65,149 @@ async function searchGame(e) {
             setUserGameData(game)
         }
         row.children[0].appendChild(button)
-
         tableBody.appendChild(row);
-        searchResult = tableBody
-        });
-    })
-    .catch(error => {
-        console.error('Error fetching data:', error);
-    })
+    });
 }
-// the transition screen should be called 
-// /blog/add_game route should be called in the transition screen
-// the transition screen has multiple layers -> multiple functions
-// store the data selected by the user in the memory
-// Send the data to a route
-// create a route in the backend
+
 
 async function setUserGameData(game) {
     const main = document.querySelector('main');
     const askingSection = document.createElement('div')
     askingSection.setAttribute('id', 'askingSection')
 
-    const cancelButton = document.createElement('button');
-    cancelButton.textContent = 'Go back to the list';
+    const cancleButton = document.createElement('button');
+    cancleButton.textContent = 'Go back to the list';
+    cancleButton.onclick = () => {
+        var tableBody = document.querySelector('#game-table tbody');
+        tableBody = searchResult
+    };
+    const question = document.createElement('h1');
+    question.setAttribute('id', 'question');
 
-    askingSection.appendChild(cancelButton)
-    main.appendChild(askingSection)
+    askingSection.appendChild(cancleButton);
+    askingSection.appendChild(question);
+    main.appendChild(askingSection);
 
     game['purchased'] = await setPurchased()
     if (game['purchased']) {
         game['purchase_date'] = await setPurchaseDate()
     };
-    // game['playing_platform'] = await setPlayingPlatform()
-    // game['expectation_level'] = await setExpectionLevel()
+    game['playing_platform'] = await setPlayingPlatform()
+    game['expectation_level'] = await setExpectionLevel()
 
     // const url = `/blog/add_game/?game=${game}`;
     // fetch(url)
 
-    // const tableBody = document.querySelector('#game-table tbody');
-    // tableBody.append(searchResult)
+
     console.log(game)
 }
 
 async function setPurchased() {
-    const askingSection = document.getElementById('askingSection');
-
-    const message = document.createElement('h1');
-    message.textContent = 'Did you purchase this game?'
-
+    // Fill up the HTML page
+    const purchasedDiv = document.createElement('div')
+    purchasedDiv.setAttribute('id', 'purchasedDiv')
+    const question = document.getElementById('question');
+    question.textContent = 'Did you purchase this game?'
     const yesButton = document.createElement('button');
     const noButton = document.createElement('button');
     yesButton.textContent = 'YES';
     noButton.textContent = 'NO';
     
-    askingSection.appendChild(message)
-    askingSection.appendChild(yesButton)
-    askingSection.appendChild(noButton)
+    purchasedDiv.appendChild(yesButton);
+    purchasedDiv.appendChild(noButton);
+
+    const askingSection = document.getElementById('askingSection');
+    askingSection.appendChild(purchasedDiv);
     
+    // Pause until the user clicks a button
     return new Promise((resolve) => {
         yesButton.onclick = () => resolve(true)
         noButton.onclick = () => resolve(false)
     })
-}
+};
 
 async function setPurchaseDate() {
-    const askingSection = document.getElementById('askingSection');
+    // Remove the elemetns for `purchased`
+    const purchasedDiv = document.getElementById('purchasedDiv');
+    if (purchasedDiv) {
+        purchasedDiv.remove();
+    };
 
-    const message = document.createElement('h1');
-    message.textContent = 'When did you purchase this game?';
-    askingSection.appendChild(message)
-
-    const purchaseDate = prompt('Please put the purchase date in yyyy-mm-dd')
-
-    return Promise.resolve(purchaseDate)
-}
+    var purchaseDate = prompt('Please put the purchase date in yyyy-mm-dd');
+    while (!purchaseDate.match(new RegExp('\\d{4}-\\d{2}-\\d{2}'))) {
+        purchaseDate = prompt('Please put the purchase date in yyyy-mm-dd');
+    }
+    return purchaseDate;
+};
 
 async function setPlayingPlatform() {
-    
-}
+    // Remove the elemetns for `purchased`
+    const purchasedDiv = document.getElementById('purchasedDiv');
+    if (purchasedDiv) {
+        purchasedDiv.remove();
+    };
+
+    // Fill up the HTML page
+    const platformDiv = document.createElement('div');
+    platformDiv.setAttribute('id', 'platformDiv');
+    const question = document.getElementById('question');
+    question.textContent = 'On which platform do you play this game?'
+    const ps5Button = document.createElement('button');
+    const ps5ProButton = document.createElement('button');
+    ps5Button.textContent = 'PS5';
+    ps5ProButton.textContent = 'PS5Pro';
+
+    platformDiv.appendChild(ps5Button);
+    platformDiv.appendChild(ps5ProButton);
+
+    const askingSection = document.getElementById('askingSection');
+    askingSection.appendChild(platformDiv)
+
+    return new Promise((resolve) => {
+        ps5Button.onclick = () => resolve('PS5');
+        ps5ProButton.onclick = () => resolve('PS5Pro');
+    })
+};
 
 async function setExpectionLevel() {
+    // Remove the elemetns for `platform`
+    const platformDiv = document.getElementById('platformDiv');
+    if (platformDiv) {
+        platformDiv.remove();
+    };
 
-}
+    // Fill up the HTML page
+    const expectionDiv = document.createElement('div');
+    expectionDiv.setAttribute('id', 'expectionDiv');
+    const question = document.getElementById('question');
+    question.textContent = 'How much are you hype on this game?';
+    const noticedButton = document.createElement('button');
+    const interestedButton = document.createElement('button');
+    const lookingForwardButton = document.createElement('button');
+    const hypedButton = document.createElement('button');
+    const mustPlayButton = document.createElement('button');
+    noticedButton.textContent = 'Noticed';
+    interestedButton.textContent = 'Interested';
+    lookingForwardButton.textContent = 'Looking Forward';
+    hypedButton.textContent = 'Hyped';
+    mustPlayButton.textContent = 'Must Play';
 
+    expectionDiv.appendChild(noticedButton);
+    expectionDiv.appendChild(interestedButton);
+    expectionDiv.appendChild(lookingForwardButton);
+    expectionDiv.appendChild(hypedButton);
+    expectionDiv.appendChild(mustPlayButton);
 
+    const askingSection = document.getElementById('askingSection');
+    askingSection.appendChild(expectionDiv)
+
+    return new Promise((resolve) => {
+        noticedButton.onclick = () => resolve(0);
+        interestedButton.onclick = () => resolve(1);
+        lookingForwardButton.onclick = () => resolve(2);
+        hypedButton.onclick = () => resolve(3);
+        mustPlayButton.onclick = () => resolve(4);
+    })
+};
 
 
