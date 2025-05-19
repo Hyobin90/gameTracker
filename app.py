@@ -29,5 +29,10 @@ def load_user(user_id: str):
     return User.find_user(user_id)
 
 
+@login_manager.unauthorized_handler
+def unauthorized():
+    return jsonify({'error': 'Unauthorized'}), 401
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port='8080', debug=True)

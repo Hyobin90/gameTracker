@@ -233,7 +233,7 @@
         <input type="text" class="form-control form-control-dark text-bg-dark" id="search_keyword" name="search_keyword" placeholder="Search..." aria-label="Search" required>
         <button type="submit" class="btn btn-outline-primary btn-lg">Search</button>
       </form>
-      <table id="game-table" class="table">
+      <table id="seach-result-table" class="table">
         <thead>
           <tr>
             <th>Add</th>
@@ -242,7 +242,7 @@
             <th>Release Date</th>
             <th>Genres</th>
             <th>Developers</th>
-            <th>wikidata</th>
+            <th>Wikidata</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -253,11 +253,24 @@
     {% endif %}
   </div>
   <div id="tab-tracker" class="d-none">
-    <div class="row mb-3 text-center">
-      <div class="col-4 themed-grid-col">.col-4</div>
-      <div class="col-4 themed-grid-col">.col-4</div>
-      <div class="col-4 themed-grid-col">.col-4</div>
-    </div>
+    {% if user_email != null %}
+      <table id="user-game-list-table" class="table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Expectation Level</th>
+            <th>Playing Platform</th>
+            <th>Release Date</th>
+            <th>Wikidata</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    {% else %}
+      <input type="text" class="form-control form-control-dark text-bg-dark" id="search_keyword" name="search_keyword" placeholder="Please Log in" disabled>
+      <button type="submit" class="btn btn-outline-primary btn-lg" disabled>Search</button>
+    {% endif %}
   </div>
   <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 </main>
