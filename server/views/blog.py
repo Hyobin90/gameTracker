@@ -1,7 +1,7 @@
 import bcrypt
 import datetime
 from flask import Blueprint, request, render_template, redirect, url_for, jsonify
-from flask_login import current_user, login_user, logout_user
+from flask_login import current_user, login_user, logout_user, login_required
 from instances import game_manager
 from server.controllers.user_manager import User
 from server.models.mongodb import connect_mongodb
@@ -60,6 +60,7 @@ def log_in():
 
             
 @blog.route('/log_out')
+@login_required
 def log_out():
     """Logs out the user."""
     logout_user()
@@ -86,14 +87,17 @@ def search_for_games():
 
 
 @blog.route('/add_game', methods=['GET', 'POST'])
+@login_required
 def add_game_into_game_list():
     """Adds the given game into the user's game list while adding the game into game_db if it's not in game_db."""
-    if not current_user.is_authenticated:
-        return
-    print('hello')
     game = request.get_json()
-    print(f'game: {game}')
-
     current_user.add_game(game)
 
     return redirect(url_for('.load_main_page'))
+
+
+@blog.route('/get_user_game_list', methods=['GET'])
+@login_required
+def get_user_game_list():
+    """Retrieves and returns the user's game list."""
+    return jsonify(current_user.fetch_games())

@@ -3,8 +3,13 @@ var searchResult = []
 function changeTab(name) {
     document.getElementById('tab-search').classList.toggle('d-none', name !== 'search');
     document.getElementById('tab-tracker').classList.toggle('d-none', name !== 'tracker');
+
+    if (name == 'tracker') {
+        fetchUserGameList();
+    };
 }
 
+// For Search tab
 async function searchGame(e) {
     e.preventDefault();
     const askingSection = document.getElementById('askingSection');
@@ -19,17 +24,17 @@ async function searchGame(e) {
     .then(data => {
         searchResult = data; // stores the search result in the global variable.
 
-        const tableBody = document.querySelector('#game-table tbody');
+        const tableBody = document.querySelector('#seach-result-table tbody');
         tableBody.innerHTML = '';
-        createTable(data);
+        createSearchResultTable(data);
     })
     .catch(error => {
         console.error('Error fetching data:', error);
     })
 }
 
-function createTable(data) {
-    const tableBody = document.querySelector('#game-table tbody');
+function createSearchResultTable(data) {
+    const tableBody = document.querySelector('#seach-result-table tbody');
     tableBody.innerHTML = '';
 
     data.forEach(game => {
@@ -63,8 +68,6 @@ function createTable(data) {
         row.children[0].appendChild(button)
         tableBody.appendChild(row);
     });
-
-    preservedTable = tableBody;
 }
 
 function cleanAskingSection() {
@@ -87,7 +90,7 @@ async function setUserGameData(game) {
     cancelButton.textContent = 'Go back to the list';
     cancelButton.onclick = () => {
         document.getElementById('askingSection').remove();
-        createTable(searchResult);
+        createSearchResultTable(searchResult);
     };
     const question = document.createElement('h1');
     question.setAttribute('id', 'question');
@@ -113,7 +116,7 @@ async function setUserGameData(game) {
     .then(() => {
         const askingSection = document.getElementById('askingSection');
         askingSection.remove();
-        const tableBody = document.querySelector('#game-table tbody');
+        const tableBody = document.querySelector('#seach-result-table tbody');
         tableBody.innerHTML = '';
     })
     .catch(error => {
@@ -217,3 +220,67 @@ async function setExpectionLevel() {
         mustPlayButton.onclick = () => resolve(4);
     })
 }; 
+
+
+// For tracker tab
+async function fetchUserGameList() {
+    fetch('/blog/get_user_game_list')
+    .then(response => response.json())
+    .then(data => {
+        const tableBody = document.querySelector('#user-game-list-table tbody');
+        tableBody.innerHTML = '';
+
+        data.forEach(game => {
+            const row = document.createElement('tr');
+            
+            row.innerHTML = `
+            <td>${game.title}</td>
+            <td>${game.status}</td>
+            <td></td>
+            <td>${game.playing_platform}</td>
+            <td>${game.release_date}</td>
+            <td><a href="https://wikidata.org/wiki/${game.wikidata_code}">LINK</a></td>
+            `;
+            
+            const dropdown = document.createExpectationDropDown(game.expectation_level, (newLevel) => {
+                adjustExpectionLevel(game, newLevel);
+            });
+            row.children[2].appendChild(dropdown)
+            tableBody.appendChild(row);
+        });
+    })
+    .catch(error => {
+        console.error('Error fetching data:', error);
+    })
+}
+
+
+function createExpectationDropDown(currentExpectationLevel, onChangeCallBack) {
+    const select = document.createElement('select');
+
+    const levels = ['Noticed', 'Interested', 'Looking Forward', 'Hyped', 'Must Play'];
+
+    levels.forEach((level, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = level;
+        if (index == currentExpectationLevel) {
+            console.log(`debug: current level- ${currentExpectationLevel}`);
+            option.selected = true;
+        };
+        select.appendChild(option);
+    });
+
+    select.onchange = (e) => {
+        console.log(`debug: oncahge is called`);
+        const newLevel = parseInt(e.target.value);
+        onChangeCallBack(newLevel);
+    };
+
+    return select;
+}
+
+function adjustExpectionLevel(game, newExpectationLevel) {
+    console.log(`debug: adjustExpectionLevel game: ${game}`);
+    console.log(`debug: adjustExpectionLevel game: ${newExpectationLevel}`);
+}

@@ -109,3 +109,17 @@ class User(UserMixin):
             {'$addToSet': {'game_list': target_game}}
         )
         self.game_list.append(target_game)
+
+
+    def fetch_games(self):
+        """Fetches all the games that the current user has added.
+
+        Returns:
+            game_list: The games the current user has added.
+        """
+        user_db = connect_mongodb('users')
+        user_collection = user_db.users
+
+        game_list = user_collection.find({'_id': self.user_id})
+        # parse the result first
+        return game_list
