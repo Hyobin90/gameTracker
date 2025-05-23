@@ -231,21 +231,20 @@ async function fetchUserGameList() {
         tableBody.innerHTML = '';
 
         data.forEach(game => {
+            console.log(`debug: ${game}`)
             const row = document.createElement('tr');
             
             row.innerHTML = `
             <td>${game.title}</td>
-            <td>${game.status}</td>
-            <td></td>
             <td>${game.playing_platform}</td>
             <td>${game.release_date}</td>
             <td><a href="https://wikidata.org/wiki/${game.wikidata_code}">LINK</a></td>
             `;
             
-            const dropdown = document.createExpectationDropDown(game.expectation_level, (newLevel) => {
-                adjustExpectionLevel(game, newLevel);
-            });
-            row.children[2].appendChild(dropdown)
+            // const dropdown = document.createExpectationDropDown(game.expectation_level, (newLevel) => {
+            //     adjustExpectionLevel(game, newLevel);
+            // });
+            // row.children[2].appendChild(dropdown)
             tableBody.appendChild(row);
         });
     })
@@ -255,7 +254,7 @@ async function fetchUserGameList() {
 }
 
 
-function createExpectationDropDown(currentExpectationLevel, onChangeCallBack) {
+async function createExpectationDropDown(currentExpectationLevel, onChangeCallBack) {
     const select = document.createElement('select');
 
     const levels = ['Noticed', 'Interested', 'Looking Forward', 'Hyped', 'Must Play'];

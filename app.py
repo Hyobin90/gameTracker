@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, render_template, make_response, session
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from flask_cors import CORS
+from flask_session import Session
 import os
 from server.controllers.user_manager import User
 
@@ -13,6 +14,11 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 app = Flask(__name__, static_url_path='/static', static_folder='client/static', template_folder='client/templates')
 CORS(app) # For Cross Origin Resource Sharing
 app.secret_key = 'test_key2' # TODO Temporarily, a fixed key is used to keep the sessions, testing purpose
+
+# Session
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_TYPE'] = "filesystem"
+Session(app)
 
 # Blutprint
 app.register_blueprint(blog.blog, url_prefix='/blog')
