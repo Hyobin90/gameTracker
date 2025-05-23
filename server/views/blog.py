@@ -94,10 +94,11 @@ def add_game_into_game_list():
     current_user.add_game(game)
 
     return redirect(url_for('.load_main_page'))
+    # redirect to the game list page
 
 
 @blog.route('/get_user_game_list', methods=['GET'])
 @login_required
 def get_user_game_list():
     """Retrieves and returns the user's game list."""
-    return jsonify(current_user.fetch_games())
+    return jsonify(current_user.fetch_game_list())

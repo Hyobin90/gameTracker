@@ -1,7 +1,9 @@
 import bcrypt
 from bson.objectid import ObjectId
 from flask_login import UserMixin
+from server.models.game import Game
 from server.models.mongodb import connect_mongodb
+from typing import List
 
 
 class User(UserMixin):
@@ -39,7 +41,7 @@ class User(UserMixin):
         query["$or"] = filter
         user_data = user_collection.find_one(query)
         if user_data:
-            return User(user_data['_id'], user_data['user_email'], ['game_list'])
+            return User(user_data['_id'], user_data['user_email'], user_data['game_list'])
         return None
 
 
@@ -59,7 +61,8 @@ class User(UserMixin):
             hashed_password = User.hash_password(user_password)
             user_collection.insert_one({
                 'user_email': user_email,
-                'password': hashed_password
+                'password': hashed_password,
+                'game_list': []
             })
             return User.find_user(user_email=user_email)
         else:
@@ -95,31 +98,43 @@ class User(UserMixin):
         return bcrypt.hashpw(bytes, salt)
 
 
-    def add_game(self, target_game):
+    def add_game(self, target_game_data):
         """Adds the target game into the user's game list.
         
         Args:
-            target_game: the game to add into the user's game list.
+            target_game_data: the game data to add into the user's game list.
         """
+        # Call methods from Game class when needed
+        # For now, it's only for `released` but it will expand to update other attributes such as Metacrtic score
+        if not target_game_data['released']:
+            target_game = Game(**target_game_data)
+            target_game_data['released'] = target_game.released
+
+        self.game_list.append(target_game_data)
         user_db = connect_mongodb('users')
         user_collection = user_db.users
 
         user_collection.update_one(
             {'_id': self.user_id},
-            {'$addToSet': {'game_list': target_game}}
+            {'$addToSet': {'game_list': target_game_data}}
         )
-        self.game_list.append(target_game)
 
 
-    def fetch_games(self):
-        """Fetches all the games that the current user has added.
+    def fetch_game_list(self):
+        """Fetches the game list of the current user by validating each game up to date."""
+        for game in self.game_list:
+            self.validate_game(game)
 
-        Returns:
-            game_list: The games the current user has added.
+        return self.game_list
+    
+
+    def validate_game(self, game: Game) -> None:
+        """Validates a game's status.
+        
+        Args:
+            game: The game to validate
         """
-        user_db = connect_mongodb('users')
-        user_collection = user_db.users
-
-        game_list = user_collection.find({'_id': self.user_id})
-        # parse the result first
-        return game_list
+        # TODO call game.update_status()
+        # Only if game.released is false or None
+        if not game['released']:
+            game._is_released()

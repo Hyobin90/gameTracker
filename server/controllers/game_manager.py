@@ -85,6 +85,7 @@ class GameManager:
                 'developers': element.get('developers', None),
                 'publishers': element.get('publishers', None),
                 'release_date': element.get('release_date', None).strftime('%Y-%m-%d'),
+                'released': element.get('released', None),
                 'platforms': element.get('platforms', None)
                 }
             game_candidates.append(candidate)
