@@ -231,32 +231,37 @@ async function fetchUserGameList() {
         tableBody.innerHTML = '';
 
         data.forEach(game => {
-            console.log(`debug: ${game}`)
+            console.log(`debug: ${game.title}`)
             const row = document.createElement('tr');
             
             row.innerHTML = `
             <td>${game.title}</td>
+            <td></td>
+            <td></td>
             <td>${game.playing_platform}</td>
             <td>${game.release_date}</td>
             <td><a href="https://wikidata.org/wiki/${game.wikidata_code}">LINK</a></td>
             `;
             
-            // const dropdown = document.createExpectationDropDown(game.expectation_level, (newLevel) => {
-            //     adjustExpectionLevel(game, newLevel);
-            // });
-            // row.children[2].appendChild(dropdown)
+            const statusDropDown = createStatusDropDown(game.status, (newStatus) => {
+                adjustStatus(game, newStatus);
+            })
+            const expectationDropdown = createExpectationDropDown(game.expectation_level, (newLevel) => {
+                adjustExpectionLevel(game, newLevel);
+            });
+            row.children[1].appendChild(statusDropDown);
+            row.children[2].appendChild(expectationDropdown);
             tableBody.appendChild(row);
         });
     })
     .catch(error => {
         console.error('Error fetching data:', error);
     })
-}
+};
 
 
-async function createExpectationDropDown(currentExpectationLevel, onChangeCallBack) {
+function createExpectationDropDown(currentExpectationLevel, onChangeCallBack) {
     const select = document.createElement('select');
-
     const levels = ['Noticed', 'Interested', 'Looking Forward', 'Hyped', 'Must Play'];
 
     levels.forEach((level, index) => {
@@ -264,22 +269,71 @@ async function createExpectationDropDown(currentExpectationLevel, onChangeCallBa
         option.value = index;
         option.textContent = level;
         if (index == currentExpectationLevel) {
-            console.log(`debug: current level- ${currentExpectationLevel}`);
             option.selected = true;
         };
         select.appendChild(option);
     });
 
     select.onchange = (e) => {
-        console.log(`debug: oncahge is called`);
         const newLevel = parseInt(e.target.value);
         onChangeCallBack(newLevel);
     };
 
     return select;
-}
+};
 
 function adjustExpectionLevel(game, newExpectationLevel) {
-    console.log(`debug: adjustExpectionLevel game: ${game}`);
-    console.log(`debug: adjustExpectionLevel game: ${newExpectationLevel}`);
-}
+    fetch('/blog/update_game_expectation_level', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            'game': game,
+            'new_expectation_level': newExpectationLevel
+        })
+    })
+    .catch(error => {
+        console.error(`Error updating ${game.title}'s expectation level:`, error);
+        // Display the error to the user?
+    })
+};
+
+function createStatusDropDown(currentStatus, onChangeCallBack) {
+    const select = document.createElement('select');
+    const statuses = ['Purchased', 'Playting', 'Completed', 'Dropped'];
+
+    statuses.forEach((status) => {
+        const option = document.createElement('option');
+        option.value = status;
+        option.textContent = status;
+        if (status = currentStatus) {
+            option.selected = true;
+        };
+        select.appendChild(option);
+    });
+
+    select.onchange = (e) => {
+        const newStatus = e.target.value;
+        onChangeCallBack(newStatus);
+    }
+
+    return select;
+};
+
+function adjustStatus(game, newStatus) {
+    fetch('/blog/update_game_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            'game': game,
+            'new_status': newStatus
+        })
+    })
+    .catch(error => {
+        console.error(`Error updating ${game.title}'s status:`, error);
+        // Display the error to the user?
+    })
+};

@@ -128,6 +128,21 @@ class User(UserMixin):
         return self.game_list
     
 
+    def update_game_list(self, updated_game):
+        """Updates a certain game in the user's game list.
+        
+        Args:
+            game: the game to update.
+        """
+        for index, game in enumerate(self.game_list):
+            if game.get('game_id') == updated_game.get('game_id'):
+                self.game_list[index] = updated_game
+        # TODO update the game in the list with the given property
+        # TODO update the list in MongoDB     
+        # TODO how to replace the element only
+
+
+
     def validate_game(self, game: Game) -> None:
         """Validates a game's status.
         

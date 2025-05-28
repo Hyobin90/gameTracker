@@ -102,3 +102,29 @@ def add_game_into_game_list():
 def get_user_game_list():
     """Retrieves and returns the user's game list."""
     return jsonify(current_user.fetch_game_list())
+
+
+@blog.route('/update_game_expectation_level', methods=['GET', 'POST'])
+@login_required
+def update_game_expectation_level():
+    """Updates a game's expectation level in the user's game list."""
+    request_body = request.get_json()
+    ## call a function specific to this update
+    
+    return redirect(url_for('.load_main_page'))
+    # redirect to the game list page
+
+
+@blog.route('/update_game_status', methods=['GET', 'POST'])
+@login_required
+def update_game_status():
+    """Updates a game's status in the user's game list.."""
+    # retrieve the game, and the status in str
+    request_body = request.get_json()
+    game = request_body.get('game')
+    new_status = request_body.get('new_status')
+    ## call a function specific to this update
+    #current_user.(game)
+
+    return redirect(url_for('.load_main_page'))
+    # redirect to the game list page
