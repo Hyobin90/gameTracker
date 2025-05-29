@@ -111,9 +111,9 @@ class User(UserMixin):
             target_game_data['released'] = target_game.released
 
         self.game_list.append(target_game_data)
+    
         user_db = connect_mongodb('users')
         user_collection = user_db.users
-
         user_collection.update_one(
             {'_id': self.user_id},
             {'$addToSet': {'game_list': target_game_data}}
@@ -122,34 +122,45 @@ class User(UserMixin):
 
     def fetch_game_list(self):
         """Fetches the game list of the current user by validating each game up to date."""
-        for game in self.game_list:
-            self.validate_game(game)
+        # for game in self.game_list:
+        #     self.validate_game(game)
 
         return self.game_list
     
 
-    def update_game_list(self, updated_game):
+    def update_game(self, target_game: Game, new_expectation_level: int = None, new_status: str = None):
         """Updates a certain game in the user's game list.
         
         Args:
-            game: the game to update.
+            target_game: the game to update.
         """
-        for index, game in enumerate(self.game_list):
-            if game.get('game_id') == updated_game.get('game_id'):
-                self.game_list[index] = updated_game
+        for game in self.game_list:
+            if game.get('game_id') == target_game.get('game_id'):
+                if new_expectation_level:
+                    game['expectation_level'] = new_expectation_level
+
+                    user_db = connect_mongodb('users')
+                    user_collection = user_db.users
+                    user_collection.update_one(
+                        {
+                            '_id': self.user_id,
+                            'game_list.game_id': game.get('game_id')
+                        },
+                        {'$set': {'game_list.$.expectation_level': new_expectation_level}}
+                    )
+                # if new_status:
+                #     game.
+
         # TODO update the game in the list with the given property
+
         # TODO update the list in MongoDB     
         # TODO how to replace the element only
 
 
-
-    def validate_game(self, game: Game) -> None:
-        """Validates a game's status.
+    def validate_game_status(self, target_game: Game):
+        """Validate a game's status regarding its release date This only affects the game entries in the user's list.
         
         Args:
-            game: The game to validate
+            target_game: the game to validate on its release.
         """
-        # TODO call game.update_status()
-        # Only if game.released is false or None
-        if not game['released']:
-            game._is_released()
+

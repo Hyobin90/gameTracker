@@ -109,7 +109,10 @@ def get_user_game_list():
 def update_game_expectation_level():
     """Updates a game's expectation level in the user's game list."""
     request_body = request.get_json()
-    ## call a function specific to this update
+    game = request_body.get('game')
+    new_expectation_level = request_body.get('new_expectation_level')
+
+    current_user.update_game(target_game = game, new_expectation_level = new_expectation_level)
     
     return redirect(url_for('.load_main_page'))
     # redirect to the game list page
