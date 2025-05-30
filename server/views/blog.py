@@ -112,13 +112,13 @@ def update_game_expectation_level():
     game = request_body.get('game')
     new_expectation_level = request_body.get('new_expectation_level')
 
-    current_user.update_game(target_game = game, new_expectation_level = new_expectation_level)
+    current_user.update_game(target_game=game, new_expectation_level=new_expectation_level)
     
     return redirect(url_for('.load_main_page'))
     # redirect to the game list page
 
 
-@blog.route('/update_game_status', methods=['GET', 'POST'])
+@blog.route('/update_game_status', methods=['GET', 'POST']) ## TODO should it be with put?
 @login_required
 def update_game_status():
     """Updates a game's status in the user's game list.."""
@@ -126,8 +126,7 @@ def update_game_status():
     request_body = request.get_json()
     game = request_body.get('game')
     new_status = request_body.get('new_status')
-    ## call a function specific to this update
-    #current_user.(game)
+    current_user.update_game(target_game=game, new_status=new_status)
 
     return redirect(url_for('.load_main_page'))
     # redirect to the game list page

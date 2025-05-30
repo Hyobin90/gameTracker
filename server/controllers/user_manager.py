@@ -107,8 +107,10 @@ class User(UserMixin):
         # Call methods from Game class when needed
         # For now, it's only for `released` but it will expand to update other attributes such as Metacrtic score
         if not target_game_data['released']:
-            target_game = Game(**target_game_data)
-            target_game_data['released'] = target_game.released
+            target_game_data['released'] = Game.is_released(target_game_data.get('release_date'))
+
+        Game.process_game_status_from_dict(target_game_data.get('status'),
+                                           'purchased' if target_game_data.get('purchased') else '')
 
         self.game_list.append(target_game_data)
     
@@ -148,19 +150,7 @@ class User(UserMixin):
                         },
                         {'$set': {'game_list.$.expectation_level': new_expectation_level}}
                     )
-                # if new_status:
-                #     game.
-
-        # TODO update the game in the list with the given property
-
-        # TODO update the list in MongoDB     
-        # TODO how to replace the element only
-
-
-    def validate_game_status(self, target_game: Game):
-        """Validate a game's status regarding its release date This only affects the game entries in the user's list.
-        
-        Args:
-            target_game: the game to validate on its release.
-        """
+                    break
+                if new_status:
+                    return Game.process_game_status_from_dict(game['status'], new_status)
 

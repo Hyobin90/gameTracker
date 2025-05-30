@@ -1,8 +1,7 @@
 """ Defines `game` class"""
 from enum import Enum
-from typing import Dict
+from typing import List, Union
 from datetime import datetime
-import re
 
 
 class Platform(Enum):
@@ -72,60 +71,50 @@ class Game:
         self.played = None
 
 
-        # Data to be filled after playing
-        # self.my_score = 0
-        # self.goals = {}
-        # self.note = ''
-        # self.logo = None
-
-        ## Data from `PSN API`
-        # self.pro_enhanced = pro_enhanced
-        # ## Data from `Metacritics`
-        # self.meta_critics_score = 0
-        # self.meta_user_score = 0
-        # ## Data from `Opencritics`
-        # self.open_critics_score = 0
-        # self.open_user_score = 0
-
-    def update_status(self, new_status: str) -> None:
-        """Centralizes updating the status of the game based on `released`, `purchased`, and `playing`"""
-        try:
-            if not self.release_date:
-                self.status = Status.ANNOUNCED
-                return
-
-            days_till_release = self._calculate_days_till_release()
-            if not self.released:
-                if self.purchased:
-                    self.status = Status.PREORDERED
-                elif days_till_release > 180:
-                    self.status = Status.COMING
-                elif days_till_release <= 180:
-                    self.status = Status.COMING_SOON
-                return
-            
-            # TODO refactor the logic
-            if self.released:
-                if self.purchased and self.playing:
-                    self.status = Status.PLAYING
-                elif self.purchased and self.playing and new_status == 'dropped':
-                    self.status = Status.DROPPED
-                elif self.purchased:
-                    self.status = Status.PURCHASED
-                else:
-                    self.status = Status.RELEASED
-        except Exception as e:
-            print(f'Error occurred while updating Game status : {e}')
+    @staticmethod
+    def process_game_status_from_dict(released: bool, purchased: bool, current_status: str, new_status: str) -> Union[List[str], str]:
+        """Processes the game's status to return possible future statuses, or to set the status.
+        
+        Args:
+            game_data: the game data in dictionary.
+            new_status: the new status to be used in the process.
+        
+        Return:
+            status: a list of possible statuses or a certain status. 
+        """
+        if current_status == 'not':
+            pass
 
 
     def is_released(self) -> bool:
-        """Verifies whether a game has been released. This only affects the games stored in the user's list not in game_db."""
+        """Verifies whether a game has been released."""
         current_date = datetime.today()
         released = None
         if not self.release_date:
             released = False
         elif self.release_date:
             if self.release_date <= current_date:
+                released = True
+            else:
+                released = False
+        return released
+    
+    @staticmethod
+    def is_released(release_date:str) -> bool:
+        """Verifies whether a game has been released.
+        
+        Args:
+            release_date: the game's release date.
+
+        Return:
+            released: True when the game has been released.
+        """
+        current_date = datetime.today()
+        released = None
+        if not release_date:
+            released = False
+        elif release_date:
+            if release_date <= current_date:
                 released = True
             else:
                 released = False
@@ -140,31 +129,37 @@ class Game:
             current_date = datetime.today()
             return (self.release_date - current_date).days
 
-
-#     # TODO this should be called by the client
-#     def fill_post_playing_data(self):
-#         """Fills up certain data after playing"""
-#         pass
-#         # self.goals = {}
-#         # self.note = ''
-#         # self.my_score = 0
-
-
-#     def fill_meta_score(self):
-#         """Retrieve critics score and user score from `Metacritic`"""
-#         pass
-#         # self.play_platform # it will be needed for `Metacritic`
-#         # self.meta_critics_score = 0
-#         # self.meta_user_score = 0
-
-
-#     def fill_open_score(self):
-#         """Retrieve critics score and user score from `Opencritic`"""
-#         pass
-#         # self.open_critics_score = 0
-#         # self.open_user_score = 0
                 
 
+    # def process_game_status(self, new_status: str) -> None:
+    #     """Processes the game's status to decide the game's current status."""
+    #     try:
+    #         if not self.release_date:
+    #             self.status = Status.ANNOUNCED
+    #             return
+
+    #         days_till_release = self._calculate_days_till_release()
+    #         if not self.released:
+    #             if self.purchased:
+    #                 self.status = Status.PREORDERED
+    #             elif days_till_release > 180:
+    #                 self.status = Status.COMING
+    #             elif days_till_release <= 180:
+    #                 self.status = Status.COMING_SOON
+    #             return
+            
+    #         # TODO refactor the logic
+    #         if self.released:
+    #             if self.purchased and self.playing:
+    #                 self.status = Status.PLAYING
+    #             elif self.purchased and self.playing and new_status == 'dropped':
+    #                 self.status = Status.DROPPED
+    #             elif self.purchased:
+    #                 self.status = Status.PURCHASED
+    #             else:
+    #                 self.status = Status.RELEASED
+    #     except Exception as e:
+    #         print(f'Error occurred while updating Game status : {e}')
 # def _validate_date_format(value):
 #     """Validate if `value` consolidates the desired date pattern."""
 #     date_pattern = r'^\d{4}-\d{2}-\d{2}$'
